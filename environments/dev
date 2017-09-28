@@ -1,0 +1,8 @@
+[hypothesis]
+165.227.216.30
+
+[hypothesis:vars]
+ansible_python_interpreter = /usr/bin/python3
+
+[need_rds:children]
+hypothesis

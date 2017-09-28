@@ -1,0 +1,10 @@
+- src: https://github.com/openstax/ansible-role-common.git
+  version: master
+  name: openstax.common
+- src: https://github.com/openstax/ansible-role-postgres.git
+  version: master
+  name: openstax.postgresql
+- src: https://github.com/openstax/ansible-role-hypothesis.git
+  version: master
+  name: openstax.hypothesis
+

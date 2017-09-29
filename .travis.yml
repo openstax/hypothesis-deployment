@@ -11,6 +11,7 @@ install:
   - ansible --version
   - mkdir -p ./tmp  
   - "printf '[defaults]\nroles_path = ../' > ansible.cfg"
+  - ansible-galaxy install -r requirements.yml
   
 script:
   - ansible-lint tasks/main.yml

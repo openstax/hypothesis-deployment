@@ -5,7 +5,9 @@
     - example-vars.yml
   roles:
     - role: openstax.common
+      tags: common
     - role: openstax.nodejs
+      tags: nodejs
     - role: openstax.postgresql
       postgres_users:
         h_admin:
@@ -15,4 +17,6 @@
             - NOSUPERUSER
             - NOCREATEDB
             - NOCREATEROLE
+      tags: postgresql
     - role: openstax.hypothesis
+      tags: hypothesis

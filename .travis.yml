@@ -14,7 +14,6 @@ install:
   - ansible-galaxy install -r requirements.yml
   
 script:
-  - ansible-lint tasks/main.yml
   - ansible-playbook -i tests/inventory --syntax-check --list-tasks tests/test.yml
   - ansible-playbook -i tests/inventory --connection=local --become -vvvv tests/test.yml -u root
   - >

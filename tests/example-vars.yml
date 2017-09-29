@@ -1,4 +1,10 @@
 ---
+database:
+  name: hypothesis
+  port: 5432
+  user: hypothesis
+  password: adevpassword
+  
 postgres_users:
   hypothesis:
     password: foobar123

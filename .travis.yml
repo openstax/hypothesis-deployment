@@ -1,0 +1,24 @@
+---
+language: python
+python: "3.6"
+sudo: required
+matrix: 
+  fast_finish: true
+install:
+  - pip install ansible ansible-lint
+  - pip --version
+  - python --version
+  - ansible --version
+  - mkdir -p ./tmp  
+  - "printf '[defaults]\nroles_path = ../' > ansible.cfg"
+  
+script:
+  - ansible-lint tasks/main.yml
+  - ansible-playbook -i tests/inventory --syntax-check --list-tasks tests/test.yml
+  - ansible-playbook -i tests/inventory --connection=local --become -vvvv tests/test.yml -u root
+  - >
+    ansible-playbook -i tests/inventory --connection=local --become -vvvv tests/test.yml -u root
+    | grep -q 'changed=0.*failed=0'
+    && (echo 'Indepotence test: pass' && exit 0)
+    || (echo 'Indepotence test: fail' && exit 1)
+

@@ -4,6 +4,7 @@
   vars:
   roles:
     - role: openstax.common
+    - role: openstax.nodejs
     - role: openstax.postgresql
       postgres_users:
         h_admin:

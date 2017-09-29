@@ -7,4 +7,7 @@
 - src: https://github.com/openstax/ansible-role-hypothesis.git
   version: master
   name: openstax.hypothesis
+- src: https://github.com/openstax/ansible-role-nodejs.git
+  version: master
+  name: openstax.nodejs
 

@@ -1,0 +1,6 @@
+---
+- name:  Test Deployment of the Hypothesis playbook
+  vars_files:
+    - example-vars.yml
+  roles:
+

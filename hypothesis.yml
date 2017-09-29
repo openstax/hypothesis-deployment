@@ -1,6 +1,6 @@
 ---
 - name: OpenStax Hypothesis Deployment
-  hosts: hypothesis
+  hosts: hypothesis 
   vars:
   roles:
     - role: openstax.common

@@ -1,0 +1,37 @@
+---
+application:
+  directory: /var/www/hypothesis
+  name: hypothesis
+  type:
+  env_type:
+  server_name: h.openstax.org
+  accounts_server: # i.e. server1.example-accounts.com
+  nginx_conf: hypothesis.conf
+
+# Specifically for any application config files
+settings:
+  secret_key:
+  auth_url:
+  token_url:
+  user_query:
+  logout:
+
+# The user to be used in running the web service
+user:
+  name: hypothesis
+  group: www-data
+  home: /var/www/hypothesis
+
+# Enter own details or copy from other env
+github:
+  pubkey:
+  privkey:
+  user:
+  email:
+
+# For e-mail and possibly S3 stuff
+aws:
+  access_key_id:
+  secret_access_key:
+  ses_region_name:
+  ses_region_endpoint:

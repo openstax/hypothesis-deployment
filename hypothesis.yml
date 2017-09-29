@@ -1,0 +1,17 @@
+---
+- name: OpenStax Hypothesis Deployment
+  hosts: hypothesis
+  vars:
+  roles:
+    - role: openstax.common
+    - role: openstax.nodejs
+    - role: openstax.postgresql
+      postgres_users:
+        h_admin:
+          database: "{{ database.name }}"
+          password: "{{ database.password }}"
+          roles:
+            - NOSUPERUSER
+            - NOCREATEDB
+            - NOCREATEROLE
+    - role: openstax.hypothesis

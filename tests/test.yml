@@ -1,7 +1,8 @@
 ---
-- name: OpenStax Hypothesis Deployment
-  hosts: hypothesis
-  vars:
+- name:  Test Deployment of the Hypothesis playbook
+  hosts: localhost
+  vars_files:
+    - example-vars.yml
   roles:
     - role: openstax.common
     - role: openstax.nodejs

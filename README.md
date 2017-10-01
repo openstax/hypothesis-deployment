@@ -7,6 +7,11 @@ Deploy `hypothesis` to various server environments
 
 ## Roles
 
+* openstax.common
+* openstax.postgres
+* openstax.nodejs
+* openstax.hypothesis
+
 These scripts use `ansible-galaxy` to use and share roles.  Install roles by running:
 
 ```

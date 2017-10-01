@@ -1,6 +1,6 @@
 ---
 - name:  Test Deployment of the Hypothesis playbook
-  hosts: local
+  hosts: localhost
   vars_files:
     - example-vars.yml
   roles:

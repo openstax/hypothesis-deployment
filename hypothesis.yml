@@ -1,10 +1,12 @@
 ---
 - name: OpenStax Hypothesis Deployment
-  hosts: hypothesis
+  hosts: hypothesis 
   vars:
   roles:
     - role: openstax.common
+      tags: common
     - role: openstax.nodejs
+      tags: nodejs
     - role: openstax.postgresql
       postgres_users:
         h_admin:
@@ -14,4 +16,8 @@
             - NOSUPERUSER
             - NOCREATEDB
             - NOCREATEROLE
+      tags: postgres
+    - role: nginx
+      tags: nginx
     - role: openstax.hypothesis
+      tags: hypothesis

@@ -14,11 +14,11 @@ install:
   - ansible-galaxy install -r requirements.yml
   
 script:
-  - ansible-playbook -i tests/inventory --syntax-check --list-tasks tests/test.yml
-  - ansible-playbook -i tests/inventory --connection=local --become -vvvv tests/test.yml -u root
+  - ansible-playbook -i tests/inventory --syntax-check --connection=local --list-tasks tests/test.yml
+  - ansible-playbook -i tests/inventory --become --connection=local -vvvv tests/test.yml -u root
   # TODO: Change indempotence test fail back to exit 1. Forcing exit 0 to continue testing.
   - >
-    ansible-playbook -i tests/inventory --connection=local --become -vvvv tests/test.yml -u root
+    ansible-playbook -i tests/inventory --become -vvvv tests/test.yml -u root
     | grep -q 'changed=0.*failed=0'
     && (echo 'Indepotence test: pass' && exit 0)
     || (echo 'Indepotence test: fail' && exit 0)

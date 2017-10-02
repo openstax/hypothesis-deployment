@@ -1,5 +1,6 @@
 [hypothesis]
-165.227.216.30
+hdev.openstax.org
+
 
 [hypothesis:vars]
 ansible_python_interpreter = /usr/bin/python3

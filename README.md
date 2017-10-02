@@ -5,12 +5,11 @@ Deploy `hypothesis` to various server environments
 
 * hypothesis.yml - The main playbook
 
-## Roles
-
-* openstax.common
-* openstax.postgres
-* openstax.nodejs
-* openstax.hypothesis
+## Shared Roles
+* [openstax.common](https://github.com/openstax/ansible-role-common)
+* [openstax.postgres](https://github.com/openstax/ansible-role-postgres)
+* [openstax.nodejs](https://github.com/openstax/ansible-role-nodejs)
+* [openstax.hypothesis](https://github.com/openstax/ansible-role-hypothesis)
 
 These scripts use `ansible-galaxy` to use and share roles.  Install roles by running:
 

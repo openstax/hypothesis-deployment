@@ -4,15 +4,15 @@
   roles:
     - role: openstax.common
       tags: common
-    - role: postgres
+    - role: openstax.postgres
       tags: postgresql
-    - role: nginx
+    - role: openstax.nginx
       tags: nginx
-    - role: rabbitmq
+    - role: openstax.rabbitmq
       tags: rabbitmq
-    - role: wsgi-app
+    - role: openstax.wsgi
       tags: wsgi-app
     - role: openstax.nodejs
       tags: nodejs
-    - role: elastic-search
-      tags: elastic-search
+    - role: openstax.elasticsearch
+      tags: elasticsearch

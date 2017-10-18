@@ -1,23 +1,18 @@
 ---
 - name: OpenStax Hypothesis Deployment
   hosts: hypothesis 
-  vars:
   roles:
     - role: openstax.common
       tags: common
-    - role: openstax.nodejs
-      tags: nodejs
-    - role: openstax.postgresql
-      postgres_users:
-        h_admin:
-          database: "{{ database.name }}"
-          password: "{{ database.password }}"
-          roles:
-            - NOSUPERUSER
-            - NOCREATEDB
-            - NOCREATEROLE
-      tags: postgres
+    - role: postgres
+      tags: postgresql
     - role: nginx
       tags: nginx
-    - role: openstax.hypothesis
-      tags: hypothesis
+    - role: rabbitmq
+      tags: rabbitmq
+    - role: wsgi-app
+      tags: wsgi-app
+    - role: openstax.nodejs
+      tags: nodejs
+    - role: elastic-search
+      tags: elastic-search

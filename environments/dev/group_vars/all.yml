@@ -1,0 +1,32 @@
+application:
+  name: h
+  directory: /var/www/h
+  server_name: hdev.openstax.org
+  nginx_conf: /etc/nginx/sites-available/site-available.conf
+user:
+  name: hdev
+  group: www-data
+  home: /var/www/h
+github:
+  pubkey: /var/lib/rundeck/.ssh/github.id_rsa.pub
+  privkey: /var/lib/rundeck/.ssh/github.id_rsa
+  user: openstax-bot
+  email: devops@cnx.org
+virtualenv:
+  name: "{{ application.name }}"
+  python: /usr/bin/python
+  base: "{{ application.directory }}/.env"
+  requirements_path: "{{ application.directory }}/requirements-dev.in"
+nginx:
+  sites:
+    - name: hypothesis
+hypothesis:
+  client_id: adevid
+  client_secret: adevsecret
+  secret_key: adevsecretket
+
+# Override the vars specific to the according role
+openstax_wsgi_role: "{{ wsgi }}"
+openstax_postgresql_role: "{{ postgresql }}"
+nodejs_npm_global_packages: ['gulp-cli']
+nodejs_package_json_path: "{{ application.directory }}"

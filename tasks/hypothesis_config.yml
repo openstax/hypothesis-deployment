@@ -1,0 +1,7 @@
+#---
+#- name: copy over the app config via template
+#  become: yes
+#  template:
+#    src: "{{ wsgi.conf_template_src }}"
+#    dest: "{{ wsgi.conf_template_dest }}"
+#  tags: hypothesis-config

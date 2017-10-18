@@ -1,9 +1,17 @@
 [hypothesis]
 hdev.openstax.org
 
-
 [hypothesis:vars]
 ansible_python_interpreter = /usr/bin/python3
 
-[need_rds:children]
+[database_clients:children]
+hypothesis
+
+[gunicorn:children]
+hypothesis
+
+[websocket:children]
+hypothesis
+
+[ec2:children]
 hypothesis

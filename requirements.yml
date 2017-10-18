@@ -3,11 +3,28 @@
   name: openstax.common
 - src: https://github.com/openstax/ansible-role-postgres.git
   version: master
-  name: openstax.postgresql
-- src: https://github.com/openstax/ansible-role-hypothesis.git
-  version: master
-  name: openstax.hypothesis
+  name: openstax.postgres
 - src: https://github.com/openstax/ansible-role-nodejs.git
   version: master
   name: openstax.nodejs
-
+- src: https://github.com/openstax/ansible-role-wsgi.git
+  version: master
+  name: openstax.wsgi
+- src: https://github.com/openstax/ansible-role-rabbitmq.git
+  version: master
+  name: openstax.rabbitmq
+- src: https://github.com/openstax/ansible-role-elasticsearch.git
+  version: master
+  name: openstax.elasticsearch
+- src: https://github.com/openstax/ansible-role-nginx.git
+  version: master
+  name: openstax.nginx
+- src: https://github.com/openstax/ansible-role-erlang.git
+  version: master
+  name: openstax.erlang
+- src: https://github.com/openstax/ansible-role-ssl.git
+  version: master
+  name: openstax.ssl
+- src: https://github.com/openstax/ansible-role-java.git
+  version: master
+  name: openstax.java

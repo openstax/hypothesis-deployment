@@ -12,21 +12,44 @@ github:
   privkey: /var/lib/rundeck/.ssh/github.id_rsa
   user: openstax-bot
   email: devops@cnx.org
-virtualenv:
+virtualenv: &virtualenv
   name: "{{ application.name }}"
   python: /usr/bin/python
   base: "{{ application.directory }}/.env"
   requirements_path: "{{ application.directory }}/requirements-dev.in"
+  bin_dir: "{{ application.directory }}/.env/bin" 
 nginx:
   sites:
     - name: hypothesis
+  ssl: &ssl
+    s3_bucket: openstax-config
+    s3_cert_object_main: ssl/openstax.org/openstax.org.crt
+    s3_cert_object_bundle: ssl/openstax.org/gd_bundle-g2-g1.crt
+    s3_key_object:  ssl/openstax.org/openstax.org.key
+    s3_key_name: openstax.pem
+    s3_secret_access_key: "{{ aws.secret_access_key }}"
+    s3_access_key_id: "{{ aws.access_key_id }}"
+    ssl_cert_file_name: openstax.crt
 hypothesis:
+  <<: *ssl
+  server_name: "{{ application.server_name }}"
+  application_dir: "{{ application.directory }}"
+  ssl_on: yes
+  virtualenv:
+    <<: *virtualenv
   client_id: adevid
   client_secret: adevsecret
   secret_key: adevsecretket
+  database:
+    user: "{{ postgres.users[0].name }}"
+    password: "{{ postgres.users[0].password }}"
+    host: "{{ postgres.host }}"
+    database_name: "{{ postgres.databases[0].name }}"
 
 # Override the vars specific to the according role
 openstax_wsgi_role: "{{ wsgi }}"
-openstax_postgresql_role: "{{ postgresql }}"
+openstax_postgres_role: "{{ postgres }}"
+openstax_ssl_role: "{{ nginx.ssl }}"
+openstax_hypothesis_role: "{{ hypothesis }}"
 nodejs_npm_global_packages: ['gulp-cli']
 nodejs_package_json_path: "{{ application.directory }}"

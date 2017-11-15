@@ -31,20 +31,91 @@ nginx:
     s3_access_key_id: "{{ aws.access_key_id }}"
     ssl_cert_file_name: openstax.crt
 hypothesis:
+  application_name: "{{ application.name }}"
   <<: *ssl
   server_name: "{{ application.server_name }}"
   application_dir: "{{ application.directory }}"
   ssl_on: yes
-  virtualenv:
-    <<: *virtualenv
+  <<: *virtualenv
+  virtualenv_bin_dir: "{{ virtualenv.bin_dir }}"
   client_id: adevid
   client_secret: adevsecret
   secret_key: adevsecretket
+  box_rsa_private_key_content: "{{ box.rsa_private_key_content }}"
+  box_rsa_private_key_path: "{{ box.rsa_private_key_path }}"
+  environment_vars: &default_env
   database:
     user: "{{ postgres.users[0].name }}"
     password: "{{ postgres.users[0].password }}"
     host: "{{ postgres.host }}"
     database_name: "{{ postgres.databases[0].name }}"
+  services:
+    - application_name: "{{ application.name }}" 
+      template: lib/systemd/system/application.service
+      requires: h.socket
+      description: "{{ application.name }} gunicorn service"
+      dest: "/lib/systemd/system/{{ application.name}}.service"
+      service_params:
+        - name: EnvironmentFile
+          value: "-/etc/default/{{ application.name }}"
+        - name: PIDFile
+          value: "/run/gunicorn/{{ application.name }}-pid"
+        - name: User
+          value: "{{ user.name }}"
+        - name: Group
+          value: "{{ user.group }}"
+        - name: RuntimeDirectory
+          value: gunicorn
+        - name: WorkingDirectory
+          value: "{{ application.directory }}"
+        - name: ExecStart
+          value: "{{ virtualenv.bin_dir }}/gunicorn $DAEMON_OPTS"
+        - name: ExecReload
+          value: "/bin/kill -s HUP $MAINPID"
+        - name: ExecStop
+          value: "bin/kill -s TERM $MAINPID"
+        - name: PrivateTmp
+          value: true 
+      state: present
+    - template: lib/systemd/system/application.socket
+      description: "{{ application.name }} gunicorn socket"
+      application_name: "{{ application.name }}"
+      dest: "/lib/systemd/system/{{ application.name }}.socket"
+      state: present
+      service_params:
+        - name: ListenStream
+          value: "/tmp/{{ application.name }}.sock"
+    - template: etc/default/env
+      dest: "/etc/default/{{ application.name }}"
+      env_vars: 
+        - name: BOX_CLIENT_ID
+          value: "{{ box.client_id }}"
+        - name: BOX_CLIENT_SECRET
+          value: "{{ box.client_secret }}"
+        - name: BOX_FOLDER_ID
+          value: "{{ box.folder_id }}"
+        - name: BOX_RSA_PRIVATE_KEY_PASS
+          value: "{{ box.rsa_private_key_pass }}"
+        - name: BOX_RSA_PRIVATE_KEY_PATH
+          value: "{{ box.rsa_private_key_path }}"
+        - name: BOX_JWT_KEY_ID
+          value: "{{ box.jwt_key_id }}"
+        - name: APP_URL
+          value: hdev.openstax.org
+        - name: DAEMON_OPTS
+          value: |
+            "--name {{ application.name }} \
+             --paste {{ application.directory}}/conf/app.ini \
+             --capture-output \
+             --error-logfile {{ application.directory }}/logs/error.log \
+             --access-logfile {{ application.directory }}/logs/access.log \
+             --bind unix:/tmp/{{ application.name }}.sock"
+    - template: lib/systemd/system/h-worker.service
+      dest: /lib/systemd/system/h-worker.service
+      state: present
+    - template: lib/systemd/system/h-beat.service
+      dest: /lib/systemd/system/h-beat.service
+      state: present
 
 # Override the vars specific to the according role
 openstax_wsgi_role: "{{ wsgi }}"

@@ -1,23 +1,30 @@
+# main application vars
 application:
   name: h
   directory: /var/www/h
+  bin_directory: /var/www/h/bin
+  log_directory: /var/www/h/logs
   server_name: hdev.openstax.org
   nginx_conf: /etc/nginx/sites-available/site-available.conf
+
 user:
   name: hdev
   group: www-data
   home: /var/www/h
+
 github:
   pubkey: /var/lib/rundeck/.ssh/github.id_rsa.pub
   privkey: /var/lib/rundeck/.ssh/github.id_rsa
   user: openstax-bot
   email: devops@cnx.org
+
 virtualenv: &virtualenv
   name: "{{ application.name }}"
   python: /usr/bin/python
   base: "{{ application.directory }}/.env"
   requirements_path: "{{ application.directory }}/requirements-dev.in"
   bin_dir: "{{ application.directory }}/.env/bin" 
+
 nginx:
   sites:
     - name: hypothesis
@@ -30,92 +37,121 @@ nginx:
     s3_secret_access_key: "{{ aws.secret_access_key }}"
     s3_access_key_id: "{{ aws.access_key_id }}"
     ssl_cert_file_name: openstax.crt
+
+# Secret values for box
+box_vars: &box_env
+  BOX_CLIENT_ID: "{{ box.client_id }}"
+  BOX_CLIENT_SECRET: "{{ box.client_secret }}"
+  BOX_FOLDER_ID: "{{ box.folder_id }}"
+  BOX_RSA_PRIVATE_KEY_PASS: "{{ box.rsa_private_key_pass }}"
+  BOX_RSA_PRIVATE_KEY_PATH: "{{ box.rsa_private_key_path }}"
+  BOX_JWT_KEY_ID: "{{ box.jwt_key_id }}"
+
+hypothesis_vars: &hypothesis_env
+  HYPOTHESIS_CLIENT_ID: "{{ wsgi.hypothesis_client_id }}"
+  HYPOTHESIS_CLIENT_SECRET: "{{ wsgi.hypothesis_client_secret }}"
+
+celery_vars: &celery_env
+  CELERYD_NODES: w1
+  CELERY_BIN: "{{ application.bin_directory }}/celery"
+  CELERYD_OPTS: |
+    "--time-limit=300 --concurrency=1"
+  CELERYD_PID_FILE: "{{ application.directory }}/%n.pid"
+  CELERYD_LOG_FILE: "{{ application.directory }}/%n.log"
+  CELERYD_LOG_LEVEL: INFO
+
+env_vars: &default_env
+  <<: *box_env
+  <<: *hypothesis_env
+  APP_URL: hdev.openstax.org
+  SECRET_KEY: "{{ wsgi.hypothesis_secret_key }}"
+  APP_RUN_OPTS: |
+    "--name h \
+      --paste /var/www/h/conf/app.ini \
+      --capture-output \
+      --error-logfile /var/www/h/logs/error.log \
+      --access-logfile /var/www/h/logs/access.log \
+      --bind unix:/tmp/h.sock" 
+  WEBSOCKET_RUN_OPTS: | 
+    "--name h-websocket \
+      --paste /var/www/h/conf/websocket.ini \
+      --error-logfile /var/www/h/logs/websocket-error.log \
+      --access-logfile /var/www/h/logs/websocket-access.log \
+      --bind unix:/tmp/h-websocket.sock"
+# These scripts are placed in the application bin directory 
+# and utilized by systemd to start the app and workers
+init_scripts:
+  hypothesis:
+    template: var/www/h/bin/hypothesis
+    dest: /var/www/h/bin/hypothesis
+    exec: python -m h "$@"
+    env_vars: 
+      <<: *default_env
+  start_celery_worker:
+    template: var/www/h/bin/init_script
+    dest: /var/www/h/bin/start-celery-worker
+    exec: "python -m h celery worker --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}" 
+    env_vars:
+      <<: *default_env
+      <<: *celery_env
+  start_celery_beat:
+    template: var/www/h/bin/init_script
+    dest: /var/www/h/bin/start-celery-beat
+    exec: "python -m h celery beat --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}"
+    env_vars:
+      <<: *default_env
+      <<: *celery_env
+
+# These are the systemd unitfiles needed to start the main application
+services:
+  gunicorn:
+    application_name: "{{ application.name }}"
+    template: lib/systemd/system/application.service
+    description: "{{ application.name }} gunicorn service"
+    dest: "/lib/systemd/system/{{ application.name}}.service"
+    state: present
+    params: 
+      EnvironmentFile: "-/etc/default/{{ application.name }}"
+      PIDFile: "/run/gunicorn/{{ application.name }}-pid"
+      User: "{{ user.name }}"
+      Group: "{{ user.group }}"
+      RuntimeDirectory: gunicorn
+      WorkingDirectory: "{{ application.directory }}"
+      ExecStart: "{{ virtualenv.bin_dir }}/gunicorn $APP_RUN_OPTS"
+      ExecReload: "/bin/kill -s HUP $MAINPID"
+      ExecStop: "/bin/kill -s TERM $MAINPID"
+      PrivateTmp: true 
+# These are the environment files created for the services
+env_files:
+  gunicorn:
+    template: etc/default/env
+    dest: /etc/default/gunicorn
+    env_vars:
+      <<: *default_env
+
+# We define the main settings for the application role. This should happen last so that
+# we can assume all the other values exist if needed and can be passed into our config
 hypothesis:
   application_name: "{{ application.name }}"
+  init_scripts: "{{ init_scripts }}"
   <<: *ssl
   server_name: "{{ application.server_name }}"
   application_dir: "{{ application.directory }}"
   ssl_on: yes
   <<: *virtualenv
   virtualenv_bin_dir: "{{ virtualenv.bin_dir }}"
-  client_id: adevid
-  client_secret: adevsecret
+  client_id: "{{ wsgi.hypothesis_client_id }}" 
+  client_secret: "{{ wsgi.hypothesis_client_secret }}"
   secret_key: adevsecretket
   box_rsa_private_key_content: "{{ box.rsa_private_key_content }}"
   box_rsa_private_key_path: "{{ box.rsa_private_key_path }}"
-  environment_vars: &default_env
   database:
     user: "{{ postgres.users[0].name }}"
     password: "{{ postgres.users[0].password }}"
     host: "{{ postgres.host }}"
     database_name: "{{ postgres.databases[0].name }}"
-  services:
-    - application_name: "{{ application.name }}" 
-      template: lib/systemd/system/application.service
-      requires: h.socket
-      description: "{{ application.name }} gunicorn service"
-      dest: "/lib/systemd/system/{{ application.name}}.service"
-      service_params:
-        - name: EnvironmentFile
-          value: "-/etc/default/{{ application.name }}"
-        - name: PIDFile
-          value: "/run/gunicorn/{{ application.name }}-pid"
-        - name: User
-          value: "{{ user.name }}"
-        - name: Group
-          value: "{{ user.group }}"
-        - name: RuntimeDirectory
-          value: gunicorn
-        - name: WorkingDirectory
-          value: "{{ application.directory }}"
-        - name: ExecStart
-          value: "{{ virtualenv.bin_dir }}/gunicorn $DAEMON_OPTS"
-        - name: ExecReload
-          value: "/bin/kill -s HUP $MAINPID"
-        - name: ExecStop
-          value: "bin/kill -s TERM $MAINPID"
-        - name: PrivateTmp
-          value: true 
-      state: present
-    - template: lib/systemd/system/application.socket
-      description: "{{ application.name }} gunicorn socket"
-      application_name: "{{ application.name }}"
-      dest: "/lib/systemd/system/{{ application.name }}.socket"
-      state: present
-      service_params:
-        - name: ListenStream
-          value: "/tmp/{{ application.name }}.sock"
-    - template: etc/default/env
-      dest: "/etc/default/{{ application.name }}"
-      env_vars: 
-        - name: BOX_CLIENT_ID
-          value: "{{ box.client_id }}"
-        - name: BOX_CLIENT_SECRET
-          value: "{{ box.client_secret }}"
-        - name: BOX_FOLDER_ID
-          value: "{{ box.folder_id }}"
-        - name: BOX_RSA_PRIVATE_KEY_PASS
-          value: "{{ box.rsa_private_key_pass }}"
-        - name: BOX_RSA_PRIVATE_KEY_PATH
-          value: "{{ box.rsa_private_key_path }}"
-        - name: BOX_JWT_KEY_ID
-          value: "{{ box.jwt_key_id }}"
-        - name: APP_URL
-          value: hdev.openstax.org
-        - name: DAEMON_OPTS
-          value: |
-            "--name {{ application.name }} \
-             --paste {{ application.directory}}/conf/app.ini \
-             --capture-output \
-             --error-logfile {{ application.directory }}/logs/error.log \
-             --access-logfile {{ application.directory }}/logs/access.log \
-             --bind unix:/tmp/{{ application.name }}.sock"
-    - template: lib/systemd/system/h-worker.service
-      dest: /lib/systemd/system/h-worker.service
-      state: present
-    - template: lib/systemd/system/h-beat.service
-      dest: /lib/systemd/system/h-beat.service
-      state: present
+  services: "{{ services }}"
+  env_files: "{{ env_files }}"
 
 # Override the vars specific to the according role
 openstax_wsgi_role: "{{ wsgi }}"

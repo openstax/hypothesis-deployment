@@ -82,7 +82,7 @@ env_vars: &default_env
 # and utilized by systemd to start the app and workers
 init_scripts:
   hypothesis:
-    template: var/www/h/bin/hypothesis
+    template: var/www/h/bin/init_script
     dest: /var/www/h/bin/hypothesis
     exec: python -m h "$@"
     env_vars: 

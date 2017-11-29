@@ -46,24 +46,24 @@ box_vars: &box_env
   BOX_RSA_PRIVATE_KEY_PASS: "{{ box.rsa_private_key_pass }}"
   BOX_RSA_PRIVATE_KEY_PATH: "{{ box.rsa_private_key_path }}"
   BOX_JWT_KEY_ID: "{{ box.jwt_key_id }}"
+  BOX_ENTERPRISE_ID: "{{ box.enterprise_id }}"
 
 hypothesis_vars: &hypothesis_env
   HYPOTHESIS_CLIENT_ID: "{{ wsgi.hypothesis_client_id }}"
   HYPOTHESIS_CLIENT_SECRET: "{{ wsgi.hypothesis_client_secret }}"
 
 celery_vars: &celery_env
-  CELERYD_NODES: w1
-  CELERY_BIN: "{{ application.bin_directory }}/celery"
-  CELERYD_OPTS: |
-    "--time-limit=300 --concurrency=1"
-  CELERYD_PID_FILE: "{{ application.directory }}/%n.pid"
-  CELERYD_LOG_FILE: "{{ application.directory }}/%n.log"
+  CELERY_BROKER_URL: "amqp://guest:guest@localhost/%2f"
+  CELERY_RESULT_BACKEND: "amqp://"
+  CELERYD_PID_FILE: "{{ application.directory }}/celery.pid"
+  CELERYD_LOG_FILE: "{{ application.log_directory }}/celery.log"
   CELERYD_LOG_LEVEL: INFO
+  CELERY_BEAT_LOG_FILE: "{{ application.log_directory }}/celery-beat.log"
 
 env_vars: &default_env
   <<: *box_env
   <<: *hypothesis_env
-  APP_URL: hdev.openstax.org
+  APP_URL: "{{ application.server_name }}" 
   SECRET_KEY: "{{ wsgi.hypothesis_secret_key }}"
   APP_RUN_OPTS: |
     "--name h \
@@ -97,7 +97,7 @@ init_scripts:
   start_celery_beat:
     template: var/www/h/bin/init_script
     dest: /var/www/h/bin/start-celery-beat
-    exec: "python -m h celery beat --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}"
+    exec: "python -m h celery beat --logfile=${CELERY_BEAT_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}"
     env_vars:
       <<: *default_env
       <<: *celery_env
@@ -129,11 +129,19 @@ env_files:
     env_vars:
       <<: *default_env
 
+# These are the tmpfiles.d used for the services which set permissions on the tmp files
+tmpfiles:
+ h_socket:
+   template: etc/tmpfiles.d/tmpfile
+   dest: "/etc/tmpfiles.d/{{ application.name }}.socket"
+   tmpfile: "d /tmp/{{ application.name }}.sock 0755 {{ user.name }} {{ user.group }} -"
+
 # We define the main settings for the application role. This should happen last so that
 # we can assume all the other values exist if needed and can be passed into our config
 hypothesis:
   application_name: "{{ application.name }}"
   init_scripts: "{{ init_scripts }}"
+  user: "{{ user.name }}"
   <<: *ssl
   server_name: "{{ application.server_name }}"
   application_dir: "{{ application.directory }}"
@@ -142,7 +150,6 @@ hypothesis:
   virtualenv_bin_dir: "{{ virtualenv.bin_dir }}"
   client_id: "{{ wsgi.hypothesis_client_id }}" 
   client_secret: "{{ wsgi.hypothesis_client_secret }}"
-  secret_key: adevsecretket
   box_rsa_private_key_content: "{{ box.rsa_private_key_content }}"
   box_rsa_private_key_path: "{{ box.rsa_private_key_path }}"
   database:
@@ -152,6 +159,7 @@ hypothesis:
     database_name: "{{ postgres.databases[0].name }}"
   services: "{{ services }}"
   env_files: "{{ env_files }}"
+  tmpfiles: "{{ tmpfiles }}"
 
 # Override the vars specific to the according role
 openstax_wsgi_role: "{{ wsgi }}"
@@ -159,4 +167,4 @@ openstax_postgres_role: "{{ postgres }}"
 openstax_ssl_role: "{{ nginx.ssl }}"
 openstax_hypothesis_role: "{{ hypothesis }}"
 nodejs_npm_global_packages: ['gulp-cli']
-nodejs_package_json_path: "{{ application.directory }}"
+nodejs_install_npm_user: "{{ user.name }}"

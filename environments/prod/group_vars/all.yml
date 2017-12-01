@@ -1,0 +1,207 @@
+# main application vars
+application:
+  name: h
+  directory: /var/www/h
+  bin_directory: /var/www/h/bin
+  log_directory: /var/www/h/logs
+  server_name: hprod.openstax.org
+  nginx_conf: /etc/nginx/sites-available/site-available.conf
+
+user:
+  name: hstaging
+  group: www-data
+  home: /var/www/h
+
+github:
+  pubkey: /var/lib/rundeck/.ssh/github.id_rsa.pub
+  privkey: /var/lib/rundeck/.ssh/github.id_rsa
+  user: openstax-bot
+  email: devops@cnx.org
+
+virtualenv: &virtualenv
+  name: "{{ application.name }}"
+  python: /usr/bin/python
+  base: "{{ application.directory }}/.env"
+  requirements_path: "{{ application.directory }}/requirements-dev.in"
+  bin_dir: "{{ application.directory }}/.env/bin" 
+
+nginx:
+  sites:
+    - name: hypothesis
+  ssl: &ssl
+    s3_bucket: openstax-config
+    s3_cert_object_main: ssl/openstax.org/openstax.org.crt
+    s3_cert_object_bundle: ssl/openstax.org/gd_bundle-g2-g1.crt
+    s3_key_object:  ssl/openstax.org/openstax.org.key
+    s3_key_name: openstax.pem
+    s3_secret_access_key: "{{ aws.secret_access_key }}"
+    s3_access_key_id: "{{ aws.access_key_id }}"
+    ssl_cert_file_name: openstax.crt
+
+# Secret values for box
+box_vars: &box_env
+  BOX_CLIENT_ID: "{{ box.client_id }}"
+  BOX_CLIENT_SECRET: "{{ box.client_secret }}"
+  BOX_FOLDER_ID: "{{ box.folder_id }}"
+  BOX_RSA_PRIVATE_KEY_PASS: "{{ box.rsa_private_key_pass }}"
+  BOX_RSA_PRIVATE_KEY_PATH: "{{ box.rsa_private_key_path }}"
+  BOX_JWT_KEY_ID: "{{ box.jwt_key_id }}"
+
+hypothesis_vars: &hypothesis_env
+  HYPOTHESIS_CLIENT_ID: "{{ wsgi.hypothesis_client_id }}"
+  HYPOTHESIS_CLIENT_SECRET: "{{ wsgi.hypothesis_client_secret }}"
+
+celery_vars: &celery_env
+  CELERYD_PID_FILE: "{{ application.directory }}/celery.pid"
+  CELERYD_LOG_FILE: "{{ application.log_directory }}/celery.log"
+  CELERY_BEAT_LOG_FILE: "{{ application.log_directory }}/celery-beat.log"
+  CELERYD_LOG_LEVEL: INFO
+
+env_vars: &default_env
+  <<: *box_env
+  <<: *hypothesis_env
+  APP_URL: "{{ application.server_name }}"
+  SECRET_KEY: "{{ wsgi.hypothesis_secret_key }}"
+  APP_RUN_OPTS: |
+    "--name h \
+      --paste /var/www/h/conf/app.ini \
+      --capture-output \
+      --error-logfile /var/www/h/logs/error.log \
+      --access-logfile /var/www/h/logs/access.log \
+      --bind unix:/tmp/h.sock" 
+  WEBSOCKET_RUN_OPTS: | 
+    "--name h-websocket \
+      --paste /var/www/h/conf/websocket.ini \
+      --error-logfile /var/www/h/logs/websocket-error.log \
+      --access-logfile /var/www/h/logs/websocket-access.log \
+      --bind unix:/tmp/h-websocket.sock"
+# These scripts are placed in the application bin directory 
+# and utilized by systemd to start the app and workers
+init_scripts:
+  hypothesis:
+    template: var/www/h/bin/hypothesis
+    dest: /var/www/h/bin/hypothesis
+    exec: python -m h "$@"
+    env_vars: 
+      <<: *default_env
+  start_celery_worker:
+    template: var/www/h/bin/init_script
+    dest: /var/www/h/bin/start-celery-worker
+    exec: "python -m h celery worker --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}" 
+    env_vars:
+      <<: *default_env
+      <<: *celery_env
+  start_celery_beat:
+    template: var/www/h/bin/init_script
+    dest: /var/www/h/bin/start-celery-beat
+    exec: "python -m h celery beat --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}"
+    env_vars:
+      <<: *default_env
+      <<: *celery_env
+
+# These are the systemd unitfiles needed to start the main application
+services:
+  h_service:
+    requires: "{{ application.name }}.socket"
+    application_name: "{{ application.name }}"
+    template: lib/systemd/system/application.service
+    description: "{{ application.name }} gunicorn service"
+    dest: "/lib/systemd/system/{{ application.name}}.service"
+    state: present
+    params: 
+      EnvironmentFile: "-/etc/default/{{ application.name }}"
+      PIDFile: "/run/gunicorn/{{ application.name }}-pid"
+      User: "{{ user.name }}"
+      Group: "{{ user.group }}"
+      RuntimeDirectory: gunicorn
+      WorkingDirectory: "{{ application.directory }}"
+      ExecStart: "{{ virtualenv.bin_dir }}/gunicorn $APP_RUN_OPTS"
+      ExecReload: "/bin/kill -s HUP $MAINPID"
+      ExecStop: "/bin/kill -s TERM $MAINPID"
+      PrivateTmp: true
+  h_socket:
+    application_name: "{{ application.name }}.socket"
+    template: lib/systemd/system/application.socket
+    description: "{{ application.name }} gunicorn socket"
+    dest: "/lib/systemd/system/{{ application.name}}.socket"
+    state: present
+    params: 
+      ListenStream: "/tmp/{{ application.name }}.sock"
+  h_worker:
+    application_name: "{{ application.name }}-worker"
+    template: lib/systemd/system/application.service
+    description: "{{ application.name }} gunicorn service"
+    dest: "/lib/systemd/system/{{ application.name}}-worker.service"
+    state: present
+    params: 
+      PIDFile: "{{ application.directory }}/celery.pid"
+      User: "{{ user.name }}"
+      Group: "{{ user.group }}"
+      RuntimeDirectory: celery 
+      WorkingDirectory: "{{ application.directory }}"
+      ExecStart: "{{ application.bin_directory }}/start-celery-worker"
+      ExecReload: "/bin/kill -s HUP $MAINPID"
+      ExecStop: "/bin/kill -s TERM $MAINPID"
+  h_beat:
+    application_name: "{{ application.name }}-beat"
+    template: lib/systemd/system/application.service
+    description: "{{ application.name }} gunicorn service"
+    dest: "/lib/systemd/system/{{ application.name}}-beat.service"
+    state: present
+    params: 
+      PIDFile: "{{ application.directory }}/celeryscheduler.pid"
+      User: "{{ user.name }}"
+      Group: "{{ user.group }}"
+      RuntimeDirectory: celery 
+      WorkingDirectory: "{{ application.directory }}"
+      ExecStart: "{{ application.bin_directory }}/start-celery-beat"
+      ExecReload: "/bin/kill -s HUP $MAINPID"
+      ExecStop: "/bin/kill -s TERM $MAINPID"
+# These are the environment files created for the services
+env_files:
+  gunicorn:
+    template: etc/default/env
+    dest: /etc/default/h
+    env_vars:
+      <<: *default_env
+
+# These are the tmpfiles.d used for the services
+tmpfiles:
+ h_socket:
+   template: etc/tmpfiles.d/tmpfile
+   dest: "/etc/tmpfiles.d/{{ application.name }}.socket"
+   tmpfile: "d /tmp/{{ application.name }}.sock 0755 {{ user.name }} {{ user.group }} -"
+
+# We define the main settings for the application role. This should happen last so that
+# we can assume all the other values exist if needed and can be passed into our config
+hypothesis:
+  application_name: "{{ application.name }}"
+  user: "{{ user.name }}"
+  init_scripts: "{{ init_scripts }}"
+  <<: *ssl
+  server_name: "{{ application.server_name }}"
+  application_dir: "{{ application.directory }}"
+  ssl_on: yes
+  <<: *virtualenv
+  virtualenv_bin_dir: "{{ virtualenv.bin_dir }}"
+  client_id: "{{ wsgi.hypothesis_client_id }}" 
+  client_secret: "{{ wsgi.hypothesis_client_secret }}"
+  secret_key: wlakjdslkjflkejkejdkdsaaaaakkekeKKDHDklslkj113330- 
+  box_rsa_private_key_content: "{{ box.rsa_private_key_content }}"
+  box_rsa_private_key_path: "{{ box.rsa_private_key_path }}"
+  database:
+    user: "{{ postgres.databases[0].user }}"
+    password: "{{ postgres.databases[0].password }}"
+    host: "{{ postgres.host }}"
+    database_name: "{{ postgres.databases[0].name }}"
+  services: "{{ services }}"
+  env_files: "{{ env_files }}"
+  tmpfiles: "{{ tmpfiles }}"
+# Override the vars specific to the according role
+openstax_wsgi_role: "{{ wsgi }}"
+openstax_postgres_role: "{{ postgres }}"
+openstax_ssl_role: "{{ nginx.ssl }}"
+openstax_hypothesis_role: "{{ hypothesis }}"
+nodejs_npm_global_packages: ['gulp-cli']
+nodejs_install_npm_user: "{{ user.name }}"
+nodejs_package_json_path: "{{ application.directory }}"

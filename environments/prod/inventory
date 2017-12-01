@@ -1,0 +1,20 @@
+[hypothesis]
+hprod.openstax.org
+
+[hypothesis:vars]
+ansible_python_interpreter = /usr/bin/python3
+
+[database_clients:children]
+hypothesis
+
+[gunicorn:children]
+hypothesis
+
+[websocket:children]
+hypothesis
+
+[ec2:children]
+hypothesis
+
+[box:children]
+hypothesis

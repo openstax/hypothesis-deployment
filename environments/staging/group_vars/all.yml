@@ -190,8 +190,8 @@ hypothesis:
   box_rsa_private_key_content: "{{ box.rsa_private_key_content }}"
   box_rsa_private_key_path: "{{ box.rsa_private_key_path }}"
   database:
-    user: "{{ postgres.users[0].name }}"
-    password: "{{ postgres.users[0].password }}"
+    user: "{{ postgres.databases[0].user }}"
+    password: "{{ postgres.databases[0].password }}"
     host: "{{ postgres.host }}"
     database_name: "{{ postgres.databases[0].name }}"
   services: "{{ services }}"
@@ -204,3 +204,4 @@ openstax_ssl_role: "{{ nginx.ssl }}"
 openstax_hypothesis_role: "{{ hypothesis }}"
 nodejs_npm_global_packages: ['gulp-cli']
 nodejs_install_npm_user: "{{ user.name }}"
+nodejs_package_json_path: "{{ application.directory }}"

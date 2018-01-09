@@ -28,17 +28,14 @@ virtualenv: &virtualenv
 nginx:
   sites:
     - name: hypothesis
-  ssl: &ssl
-    s3_bucket: openstax-config
-    s3_cert_object_main: ssl/openstax.org/openstax.org.crt
-    s3_cert_object_bundle: ssl/openstax.org/gd_bundle-g2-g1.crt
-    s3_key_object:  ssl/openstax.org/openstax.org.key
-    s3_key_name: openstax.pem
-    s3_secret_access_key: "{{ aws.secret_access_key }}"
-    s3_access_key_id: "{{ aws.access_key_id }}"
-    ssl_cert_file_name: openstax.crt
 
-# Secret values for box
+# With some of the more application specific things defined we are going to 
+# start creating the groups of different environmental variables we'll need
+# to run our application. YAML anchors are used to reduce the need to duplicate
+# these values. They are set once at the top of the file and then overwritten
+# when necessary. 
+
+# rice.app.box.com values in order to do the annotation export
 box_vars: &box_env
   BOX_CLIENT_ID: "{{ box.client_id }}"
   BOX_CLIENT_SECRET: "{{ box.client_secret }}"
@@ -48,10 +45,12 @@ box_vars: &box_env
   BOX_JWT_KEY_ID: "{{ box.jwt_key_id }}"
   BOX_ENTERPRISE_ID: "{{ box.enterprise_id }}"
 
+# Hypothesis env vars
 hypothesis_vars: &hypothesis_env
   HYPOTHESIS_CLIENT_ID: "{{ wsgi.hypothesis_client_id }}"
   HYPOTHESIS_CLIENT_SECRET: "{{ wsgi.hypothesis_client_secret }}"
 
+# Celery env vars
 celery_vars: &celery_env
   CELERY_BROKER_URL: "amqp://guest:guest@localhost/%2f"
   CELERY_RESULT_BACKEND: "amqp://"
@@ -60,6 +59,7 @@ celery_vars: &celery_env
   CELERYD_LOG_LEVEL: INFO
   CELERY_BEAT_LOG_FILE: "{{ application.log_directory }}/celery-beat.log"
 
+# The default env used in each of the init_scripts for running Hypothesis
 env_vars: &default_env
   <<: *box_env
   <<: *hypothesis_env
@@ -78,6 +78,7 @@ env_vars: &default_env
       --error-logfile /var/www/h/logs/websocket-error.log \
       --access-logfile /var/www/h/logs/websocket-access.log \
       --bind unix:/tmp/h-websocket.sock"
+
 # These scripts are placed in the application bin directory 
 # and utilized by systemd to start the app and workers
 init_scripts:
@@ -121,6 +122,7 @@ services:
       ExecReload: "/bin/kill -s HUP $MAINPID"
       ExecStop: "/bin/kill -s TERM $MAINPID"
       PrivateTmp: true 
+
 # These are the environment files created for the services
 env_files:
   gunicorn:
@@ -142,10 +144,12 @@ hypothesis:
   application_name: "{{ application.name }}"
   init_scripts: "{{ init_scripts }}"
   user: "{{ user.name }}"
-  <<: *ssl
+  group: "{{ user.group }}"
   server_name: "{{ application.server_name }}"
   application_dir: "{{ application.directory }}"
   ssl_on: yes
+  ssl_cert_file_name: openstax.crt
+  s3_key_name: openstax.pem
   <<: *virtualenv
   virtualenv_bin_dir: "{{ virtualenv.bin_dir }}"
   client_id: "{{ wsgi.hypothesis_client_id }}" 
@@ -166,5 +170,41 @@ openstax_wsgi_role: "{{ wsgi }}"
 openstax_postgres_role: "{{ postgres }}"
 openstax_ssl_role: "{{ nginx.ssl }}"
 openstax_hypothesis_role: "{{ hypothesis }}"
+
+# The vars originally used in this playbook were based on using hashes
+# We are moving away from that so to using the "flatter" 
+# namespaced variables that start with rolename_var_name.
+
+# npm
 nodejs_npm_global_packages: ['gulp-cli']
 nodejs_install_npm_user: "{{ user.name }}"
+nodejs_package_json_path: "{{ application.directory }}"
+
+# ssl
+ssl_www_user: www-data
+ssl_s3_bucket: openstax-config
+ssl_s3_primary_cert: ssl/openstax.org/openstax.org.crt
+ssl_s3_intermediate_cert: ssl/openstax.org/gd_bundle-g2-g1.crt
+ssl_s3_private_key:  ssl/openstax.org/openstax.org.key
+ssl_s3_key_name: openstax.pem
+ssl_s3_aws_secret_access_key: "{{ aws.secret_access_key }}"
+ssl_s3_aws_access_key_id: "{{ aws.access_key_id }}"
+ssl_cert_file_name: openstax.crt
+ssl_copy: ~
+
+# papertrail
+papertrail_url: "{{ papertrail.url }}"
+papertrail_ssl_dest_cert_dir: "{{ ssl_dest_cert_dir }}"
+papertrail_watch_files: 
+  - path: "/var/www/h/logs/access.log"
+    unique_name: "{{ application.name }}_access"
+  - path: "/var/www/h/logs/error.log"
+    unique_name: "{{ application.name }}_error"
+  - path: "/var/www/h/logs/celery.log"
+    unique_name: "{{ application.name }}_celery_worker"
+  - path: "/var/www/h/logs/celery-beat.log"
+    unique_name: "{{ application.name }}_celery_beat"
+  - path: "/var/log/nginx/error.log"
+    unique_name: "{{ application.name }}_nginx_error"
+  - path: "/var/log/nginx/access.log"
+    unique_name: "{{ application.name }}_nginx_access"

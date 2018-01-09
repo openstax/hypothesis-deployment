@@ -1,3 +1,4 @@
+# View comments placed on vars inside of the dev environment for a more in-depth explanation
 # main application vars
 application:
   name: h
@@ -28,15 +29,6 @@ virtualenv: &virtualenv
 nginx:
   sites:
     - name: hypothesis
-  ssl: &ssl
-    s3_bucket: openstax-config
-    s3_cert_object_main: ssl/openstax.org/openstax.org.crt
-    s3_cert_object_bundle: ssl/openstax.org/gd_bundle-g2-g1.crt
-    s3_key_object:  ssl/openstax.org/openstax.org.key
-    s3_key_name: openstax.pem
-    s3_secret_access_key: "{{ aws.secret_access_key }}"
-    s3_access_key_id: "{{ aws.access_key_id }}"
-    ssl_cert_file_name: openstax.crt
 
 # Secret values for box
 box_vars: &box_env
@@ -161,7 +153,8 @@ services:
       ExecStart: "{{ application.bin_directory }}/start-celery-beat"
       ExecReload: "/bin/kill -s HUP $MAINPID"
       ExecStop: "/bin/kill -s TERM $MAINPID"
-# These are the environment files created for the services which have the env vars
+
+# These are the environment files created for the services which need the env vars
 env_files:
   gunicorn:
     template: etc/default/env
@@ -182,10 +175,11 @@ hypothesis:
   application_name: "{{ application.name }}"
   user: "{{ user.name }}"
   init_scripts: "{{ init_scripts }}"
-  <<: *ssl
   server_name: "{{ application.server_name }}"
   application_dir: "{{ application.directory }}"
   ssl_on: yes
+  ssl_cert_file_name: openstax.crt
+  s3_key_name: openstax.pem
   <<: *virtualenv
   virtualenv_bin_dir: "{{ virtualenv.bin_dir }}"
   client_id: "{{ wsgi.hypothesis_client_id }}" 
@@ -207,5 +201,37 @@ openstax_wsgi_role: "{{ wsgi }}"
 openstax_postgres_role: "{{ postgres }}"
 openstax_ssl_role: "{{ nginx.ssl }}"
 openstax_hypothesis_role: "{{ hypothesis }}"
+
+# npm
 nodejs_npm_global_packages: ['gulp-cli']
 nodejs_install_npm_user: "{{ user.name }}"
+nodejs_package_json_path: "{{ application.directory }}"
+
+# ssl
+ssl_www_user: www-data
+ssl_s3_bucket: openstax-config
+ssl_s3_primary_cert: ssl/openstax.org/openstax.org.crt
+ssl_s3_intermediate_cert: ssl/openstax.org/gd_bundle-g2-g1.crt
+ssl_s3_private_key:  ssl/openstax.org/openstax.org.key
+ssl_s3_key_name: openstax.pem
+ssl_s3_aws_secret_access_key: "{{ aws.secret_access_key }}"
+ssl_s3_aws_access_key_id: "{{ aws.access_key_id }}"
+ssl_cert_file_name: openstax.crt
+ssl_copy: ~
+
+# papertrail
+papertrail_url: "{{ papertrail.url }}"
+papertrail_ssl_dest_cert_dir: "{{ ssl_dest_cert_dir }}"
+papertrail_watch_files: 
+  - path: "/var/www/h/logs/access.log"
+    unique_name: "{{ application.name }}_access"
+  - path: "/var/www/h/logs/error.log"
+    unique_name: "{{ application.name }}_error"
+  - path: "/var/www/h/logs/celery.log"
+    unique_name: "{{ application.name }}_celery_worker"
+  - path: "/var/www/h/logs/celery-beat.log"
+    unique_name: "{{ application.name }}_celery_beat"
+  - path: "/var/log/nginx/error.log"
+    unique_name: "{{ application.name }}_nginx_error"
+  - path: "/var/log/nginx/access.log"
+    unique_name: "{{ application.name }}_nginx_access"

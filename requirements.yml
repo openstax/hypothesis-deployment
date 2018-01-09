@@ -28,3 +28,6 @@
 - src: https://github.com/openstax/ansible-role-java.git
   version: master
   name: openstax.java
+- src: https://github.com/openstax/ansible-role-papertrail.git
+  version: master
+  name: openstax.papertrail

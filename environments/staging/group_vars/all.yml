@@ -4,6 +4,10 @@ application:
   directory: /var/www/h
   bin_directory: /var/www/h/bin
   log_directory: /var/www/h/logs
+  error_log: /var/www/h/logs/error.log
+  access_log: /var/www/h/logs/access.log
+  worker_log: /var/www/h/logs/celery.log
+  celery_beat_log: /var/www/h/logs/celery-beat.log
   server_name: hstaging.openstax.org
   nginx_conf: /etc/nginx/sites-available/site-available.conf
 
@@ -163,39 +167,6 @@ tmpfiles:
    dest: "/etc/tmpfiles.d/{{ application.name }}.socket"
    tmpfile: "d /tmp/{{ application.name }}.sock 0755 {{ user.name }} {{ user.group }} -"
 
-# We define the main settings for the application role. This should happen last so that
-# we can assume all the other values exist if needed and can be passed into our config
-hypothesis:
-  application_name: "{{ application.name }}"
-  user: "{{ user.name }}"
-  init_scripts: "{{ init_scripts }}"
-  server_name: "{{ application.server_name }}"
-  application_dir: "{{ application.directory }}"
-  ssl_on: yes
-  ssl_cert_file_name: openstax.crt
-  s3_key_name: openstax.pem
-  <<: *virtualenv
-  virtualenv_bin_dir: "{{ virtualenv.bin_dir }}"
-  client_id: "{{ wsgi.hypothesis_client_id }}" 
-  client_secret: "{{ wsgi.hypothesis_client_secret }}"
-  secret_key: adevsecretket
-  box_rsa_private_key_content: "{{ box.rsa_private_key_content }}"
-  box_rsa_private_key_path: "{{ box.rsa_private_key_path }}"
-  database:
-    user: "{{ postgres.databases[0].user }}"
-    password: "{{ postgres.databases[0].password }}"
-    host: "{{ postgres.host }}"
-    database_name: "{{ postgres.databases[0].name }}"
-  services: "{{ services }}"
-  env_files: "{{ env_files }}"
-  tmpfiles: "{{ tmpfiles }}"
-
-# Override the vars specific to role
-openstax_wsgi_role: "{{ wsgi }}"
-openstax_postgres_role: "{{ postgres }}"
-openstax_ssl_role: "{{ nginx.ssl }}"
-openstax_hypothesis_role: "{{ hypothesis }}"
-
 # npm
 nodejs_npm_global_packages: ['gulp-cli']
 nodejs_install_npm_user: "{{ user.name }}"
@@ -229,3 +200,36 @@ papertrail_watch_files:
     unique_name: "{{ application.name }}_nginx_error"
   - path: "/var/log/nginx/access.log"
     unique_name: "{{ application.name }}_nginx_access"
+
+# We define the main settings for the application role. This should happen last so that
+# we can assume all the other values exist if needed and can be passed into our config
+hypothesis:
+  application_name: "{{ application.name }}"
+  user: "{{ user.name }}"
+  init_scripts: "{{ init_scripts }}"
+  server_name: "{{ application.server_name }}"
+  application_dir: "{{ application.directory }}"
+  ssl_on: yes
+  ssl_cert_file_name: "{{ ssl_cert_file_name }}"
+  s3_key_name: "{{ ssl_s3_key_name }}" 
+  <<: *virtualenv
+  virtualenv_bin_dir: "{{ virtualenv.bin_dir }}"
+  client_id: "{{ wsgi.hypothesis_client_id }}" 
+  client_secret: "{{ wsgi.hypothesis_client_secret }}"
+  box_rsa_private_key_content: "{{ box.rsa_private_key_content }}"
+  box_rsa_private_key_path: "{{ box.rsa_private_key_path }}"
+  database:
+    user: "{{ postgres.databases[0].user }}"
+    password: "{{ postgres.databases[0].password }}"
+    host: "{{ postgres.host }}"
+    database_name: "{{ postgres.databases[0].name }}"
+  services: "{{ services }}"
+  env_files: "{{ env_files }}"
+  tmpfiles: "{{ tmpfiles }}"
+
+# Override the vars specific to role
+openstax_wsgi_role: "{{ wsgi }}"
+openstax_postgres_role: "{{ postgres }}"
+openstax_ssl_role: "{{ nginx.ssl }}"
+openstax_hypothesis_role: "{{ hypothesis }}"
+

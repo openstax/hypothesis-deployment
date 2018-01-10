@@ -220,6 +220,7 @@ hypothesis:
   virtualenv_bin_dir: "{{ virtualenv.bin_dir }}"
   client_id: "{{ wsgi.hypothesis_client_id }}" 
   client_secret: "{{ wsgi.hypothesis_client_secret }}"
+  secret_key: "{{ wsgi.hypothesis_secret_key }}"  
   box_rsa_private_key_content: "{{ box.rsa_private_key_content }}"
   box_rsa_private_key_path: "{{ box.rsa_private_key_path }}"
   database:

@@ -116,6 +116,7 @@ services:
     template: lib/systemd/system/application.service
     description: "{{ application.name }} gunicorn service"
     dest: "/lib/systemd/system/{{ application.name}}.service"
+    requires: h.socket
     state: present
     params: 
       EnvironmentFile: "-/etc/default/{{ application.name }}"
@@ -131,9 +132,9 @@ services:
 
 # These are the environment files created for the services
 env_files:
-  gunicorn:
+  hypothesis:
     template: etc/default/env
-    dest: /etc/default/gunicorn
+    dest: /etc/default/h
     env_vars:
       <<: *default_env
 
@@ -141,7 +142,7 @@ env_files:
 tmpfiles:
  h_socket:
    template: etc/tmpfiles.d/tmpfile
-   dest: "/etc/tmpfiles.d/{{ application.name }}.socket"
+   dest: "/etc/tmpfiles.d/{{ application.name }}.conf"
    tmpfile: "d /tmp/{{ application.name }}.sock 0755 {{ user.name }} {{ user.group }} -"
 
 

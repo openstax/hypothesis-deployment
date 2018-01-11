@@ -18,3 +18,5 @@
       tags: elasticsearch
     - role: openstax.hypothesis
       tags: hypothesis-app
+    - role: openstax.papertrail
+      tags: papertrail

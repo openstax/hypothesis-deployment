@@ -4,6 +4,10 @@ application:
   directory: /var/www/h
   bin_directory: /var/www/h/bin
   log_directory: /var/www/h/logs
+  error_log: /var/www/h/logs/error.log
+  access_log: /var/www/h/logs/access.log
+  worker_log: /var/www/h/logs/celery.log
+  celery_beat_log: /var/www/h/logs/celery-beat.log
   server_name: hstaging.openstax.org
   nginx_conf: /etc/nginx/sites-available/site-available.conf
 
@@ -26,19 +30,18 @@ virtualenv: &virtualenv
   bin_dir: "{{ application.directory }}/.env/bin" 
 
 nginx:
+  access_log: /var/log/nginx/access.log
+  error_log: /var/log/nginx/error.log
   sites:
     - name: hypothesis
-  ssl: &ssl
-    s3_bucket: openstax-config
-    s3_cert_object_main: ssl/openstax.org/openstax.org.crt
-    s3_cert_object_bundle: ssl/openstax.org/gd_bundle-g2-g1.crt
-    s3_key_object:  ssl/openstax.org/openstax.org.key
-    s3_key_name: openstax.pem
-    s3_secret_access_key: "{{ aws.secret_access_key }}"
-    s3_access_key_id: "{{ aws.access_key_id }}"
-    ssl_cert_file_name: openstax.crt
 
-# Secret values for box
+# With some of the more application specific things defined we are going to 
+# start creating the groups of different environmental variables we'll need
+# to run our application. YAML anchors are used to reduce the need to duplicate
+# these values. They are set once at the top of the file and then overwritten
+# when necessary. 
+
+# rice.app.box.com values in order to do the annotation export
 box_vars: &box_env
   BOX_CLIENT_ID: "{{ box.client_id }}"
   BOX_CLIENT_SECRET: "{{ box.client_secret }}"
@@ -46,17 +49,24 @@ box_vars: &box_env
   BOX_RSA_PRIVATE_KEY_PASS: "{{ box.rsa_private_key_pass }}"
   BOX_RSA_PRIVATE_KEY_PATH: "{{ box.rsa_private_key_path }}"
   BOX_JWT_KEY_ID: "{{ box.jwt_key_id }}"
+  BOX_ENTERPRISE_ID: "{{ box.enterprise_id }}"
 
+# Hypothesis env vars
 hypothesis_vars: &hypothesis_env
   HYPOTHESIS_CLIENT_ID: "{{ wsgi.hypothesis_client_id }}"
   HYPOTHESIS_CLIENT_SECRET: "{{ wsgi.hypothesis_client_secret }}"
+  HYPOTHESIS_SECRET_KEY: "{{ wsgi.hypothesis_secret_key }}"
 
+# Celery env vars
 celery_vars: &celery_env
+  CELERY_BROKER_URL: "amqp://guest:guest@localhost/%2f"
+  CELERY_RESULT_BACKEND: "amqp://"
   CELERYD_PID_FILE: "{{ application.directory }}/celery.pid"
   CELERYD_LOG_FILE: "{{ application.log_directory }}/celery.log"
-  CELERY_BEAT_LOG_FILE: "{{ application.log_directory }}/celery-beat.log"
   CELERYD_LOG_LEVEL: INFO
+  CELERY_BEAT_LOG_FILE: "{{ application.log_directory }}/celery-beat.log"
 
+# The default env used in each of the init_scripts for running Hypothesis
 env_vars: &default_env
   <<: *box_env
   <<: *hypothesis_env
@@ -75,11 +85,12 @@ env_vars: &default_env
       --error-logfile /var/www/h/logs/websocket-error.log \
       --access-logfile /var/www/h/logs/websocket-access.log \
       --bind unix:/tmp/h-websocket.sock"
+
 # These scripts are placed in the application bin directory 
 # and utilized by systemd to start the app and workers
 init_scripts:
   hypothesis:
-    template: var/www/h/bin/hypothesis
+    template: var/www/h/bin/init_script
     dest: /var/www/h/bin/hypothesis
     exec: python -m h "$@"
     env_vars: 
@@ -94,7 +105,7 @@ init_scripts:
   start_celery_beat:
     template: var/www/h/bin/init_script
     dest: /var/www/h/bin/start-celery-beat
-    exec: "python -m h celery beat --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}"
+    exec: "python -m h celery beat --logfile=${CELERY_BEAT_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}"
     env_vars:
       <<: *default_env
       <<: *celery_env
@@ -102,11 +113,11 @@ init_scripts:
 # These are the systemd unitfiles needed to start the main application
 services:
   h_service:
-    requires: "{{ application.name }}.socket"
     application_name: "{{ application.name }}"
     template: lib/systemd/system/application.service
     description: "{{ application.name }} gunicorn service"
     dest: "/lib/systemd/system/{{ application.name}}.service"
+    requires: h.socket
     state: present
     params: 
       EnvironmentFile: "-/etc/default/{{ application.name }}"
@@ -157,51 +168,90 @@ services:
       ExecStart: "{{ application.bin_directory }}/start-celery-beat"
       ExecReload: "/bin/kill -s HUP $MAINPID"
       ExecStop: "/bin/kill -s TERM $MAINPID"
-# These are the environment files created for the services
+
+# These are the environment files created for the services which need the env vars
 env_files:
-  gunicorn:
+  hypothesis:
     template: etc/default/env
     dest: /etc/default/h
     env_vars:
       <<: *default_env
 
-# These are the tmpfiles.d used for the services
+# These are the tmpfiles.d used for the services which set permissions on the tmp files
 tmpfiles:
  h_socket:
    template: etc/tmpfiles.d/tmpfile
-   dest: "/etc/tmpfiles.d/{{ application.name }}.socket"
+   dest: "/etc/tmpfiles.d/{{ application.name }}.conf"
    tmpfile: "d /tmp/{{ application.name }}.sock 0755 {{ user.name }} {{ user.group }} -"
+
+# The vars originally used in this playbook were based on using hashes
+# We are moving away from that so to using "flatter" 
+# namespaced variables that start with rolename_var_name.
+
+# npm
+nodejs_npm_global_packages: ['gulp-cli']
+nodejs_install_npm_user: "{{ user.name }}"
+nodejs_package_json_path: "{{ application.directory }}"
+
+# ssl
+ssl_www_user: www-data
+ssl_s3_bucket: openstax-config
+ssl_s3_primary_cert: ssl/openstax.org/openstax.org.crt
+ssl_s3_intermediate_cert: ssl/openstax.org/gd_bundle-g2-g1.crt
+ssl_s3_private_key:  ssl/openstax.org/openstax.org.key
+ssl_s3_key_name: openstax.pem
+ssl_s3_aws_secret_access_key: "{{ aws.secret_access_key }}"
+ssl_s3_aws_access_key_id: "{{ aws.access_key_id }}"
+ssl_cert_file_name: openstax.crt
+ssl_copy: ~
+
+# papertrail
+papertrail_url: "{{ papertrail.url }}"
+papertrail_ssl_dest_cert_dir: "{{ ssl_dest_cert_dir }}"
+papertrail_watch_files: 
+  - path: "{{ application.access_log }}"
+    unique_name: "{{ application.name }}_access"
+  - path: "{{ application.error_log }}"
+    unique_name: "{{ application.name }}_error"
+  - path: "{{ application.worker_log }}"
+    unique_name: "{{ application.name }}_celery_worker"
+  - path: "{{ application.celery_beat_log }}"
+    unique_name: "{{ application.name }}_celery_beat"
+  - path: "{{ nginx.error_log }}"
+    unique_name: "{{ application.name }}_nginx_error"
+  - path: "{{ nginx.access_log }}"
+    unique_name: "{{ application.name }}_nginx_access"
 
 # We define the main settings for the application role. This should happen last so that
 # we can assume all the other values exist if needed and can be passed into our config
 hypothesis:
   application_name: "{{ application.name }}"
   user: "{{ user.name }}"
-  init_scripts: "{{ init_scripts }}"
-  <<: *ssl
+  group: "{{ user.group }}"
   server_name: "{{ application.server_name }}"
   application_dir: "{{ application.directory }}"
   ssl_on: yes
+  ssl_cert_file_name: "{{ ssl_cert_file_name }}"
+  s3_key_name: "{{ ssl_s3_key_name }}" 
   <<: *virtualenv
   virtualenv_bin_dir: "{{ virtualenv.bin_dir }}"
   client_id: "{{ wsgi.hypothesis_client_id }}" 
   client_secret: "{{ wsgi.hypothesis_client_secret }}"
-  secret_key: adevsecretket
+  secret_key: "{{ wsgi.hypothesis_secret_key }}"  
   box_rsa_private_key_content: "{{ box.rsa_private_key_content }}"
   box_rsa_private_key_path: "{{ box.rsa_private_key_path }}"
   database:
-    user: "{{ postgres.databases[0].user }}"
-    password: "{{ postgres.databases[0].password }}"
+    user: "{{ postgres.users[0].name }}"
+    password: "{{ postgres.users[0].password }}"
     host: "{{ postgres.host }}"
     database_name: "{{ postgres.databases[0].name }}"
+  init_scripts: "{{ init_scripts }}"
   services: "{{ services }}"
   env_files: "{{ env_files }}"
   tmpfiles: "{{ tmpfiles }}"
-# Override the vars specific to the according role
+
+# Override the vars specific to the role
 openstax_wsgi_role: "{{ wsgi }}"
 openstax_postgres_role: "{{ postgres }}"
 openstax_ssl_role: "{{ nginx.ssl }}"
 openstax_hypothesis_role: "{{ hypothesis }}"
-nodejs_npm_global_packages: ['gulp-cli']
-nodejs_install_npm_user: "{{ user.name }}"
-nodejs_package_json_path: "{{ application.directory }}"

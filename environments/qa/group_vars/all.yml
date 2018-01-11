@@ -1,4 +1,3 @@
-# View comments placed on vars inside of the dev environment for a more in-depth explanation
 # main application vars
 application:
   name: h
@@ -31,10 +30,18 @@ virtualenv: &virtualenv
   bin_dir: "{{ application.directory }}/.env/bin" 
 
 nginx:
+  access_log: /var/log/nginx/access.log
+  error_log: /var/log/nginx/error.log
   sites:
     - name: hypothesis
 
-# Secret values for box
+# With some of the more application specific things defined we are going to 
+# start creating the groups of different environmental variables we'll need
+# to run our application. YAML anchors are used to reduce the need to duplicate
+# these values. They are set once at the top of the file and then overwritten
+# when necessary. 
+
+# rice.app.box.com values in order to do the annotation export
 box_vars: &box_env
   BOX_CLIENT_ID: "{{ box.client_id }}"
   BOX_CLIENT_SECRET: "{{ box.client_secret }}"
@@ -44,11 +51,13 @@ box_vars: &box_env
   BOX_JWT_KEY_ID: "{{ box.jwt_key_id }}"
   BOX_ENTERPRISE_ID: "{{ box.enterprise_id }}"
 
+# Hypothesis env vars
 hypothesis_vars: &hypothesis_env
   HYPOTHESIS_CLIENT_ID: "{{ wsgi.hypothesis_client_id }}"
   HYPOTHESIS_CLIENT_SECRET: "{{ wsgi.hypothesis_client_secret }}"
   HYPOTHESIS_SECRET_KEY: "{{ wsgi.hypothesis_secret_key }}"
 
+# Celery env vars
 celery_vars: &celery_env
   CELERY_BROKER_URL: "amqp://guest:guest@localhost/%2f"
   CELERY_RESULT_BACKEND: "amqp://"
@@ -57,10 +66,11 @@ celery_vars: &celery_env
   CELERYD_LOG_LEVEL: INFO
   CELERY_BEAT_LOG_FILE: "{{ application.log_directory }}/celery-beat.log"
 
+# The default env used in each of the init_scripts for running Hypothesis
 env_vars: &default_env
   <<: *box_env
   <<: *hypothesis_env
-  APP_URL: "{{ application.server_name }}" 
+  APP_URL: "{{ application.server_name }}"
   SECRET_KEY: "{{ wsgi.hypothesis_secret_key }}"
   APP_RUN_OPTS: |
     "--name h \
@@ -75,11 +85,12 @@ env_vars: &default_env
       --error-logfile /var/www/h/logs/websocket-error.log \
       --access-logfile /var/www/h/logs/websocket-access.log \
       --bind unix:/tmp/h-websocket.sock"
+
 # These scripts are placed in the application bin directory 
 # and utilized by systemd to start the app and workers
 init_scripts:
   hypothesis:
-    template: var/www/h/bin/hypothesis
+    template: var/www/h/bin/init_script
     dest: /var/www/h/bin/hypothesis
     exec: python -m h "$@"
     env_vars: 
@@ -102,11 +113,11 @@ init_scripts:
 # These are the systemd unitfiles needed to start the main application
 services:
   h_service:
-    requires: "{{ application.name }}.socket"
     application_name: "{{ application.name }}"
     template: lib/systemd/system/application.service
     description: "{{ application.name }} gunicorn service"
     dest: "/lib/systemd/system/{{ application.name}}.service"
+    requires: h.socket
     state: present
     params: 
       EnvironmentFile: "-/etc/default/{{ application.name }}"
@@ -160,7 +171,7 @@ services:
 
 # These are the environment files created for the services which need the env vars
 env_files:
-  gunicorn:
+  hypothesis:
     template: etc/default/env
     dest: /etc/default/h
     env_vars:
@@ -170,7 +181,7 @@ env_files:
 tmpfiles:
  h_socket:
    template: etc/tmpfiles.d/tmpfile
-   dest: "/etc/tmpfiles.d/{{ application.name }}.socket"
+   dest: "/etc/tmpfiles.d/{{ application.name }}.conf"
    tmpfile: "d /tmp/{{ application.name }}.sock 0755 {{ user.name }} {{ user.group }} -"
 
 # The vars originally used in this playbook were based on using hashes
@@ -216,7 +227,7 @@ papertrail_watch_files:
 hypothesis:
   application_name: "{{ application.name }}"
   user: "{{ user.name }}"
-  init_scripts: "{{ init_scripts }}"
+  group: "{{ user.group }}"
   server_name: "{{ application.server_name }}"
   application_dir: "{{ application.directory }}"
   ssl_on: yes
@@ -234,11 +245,12 @@ hypothesis:
     password: "{{ postgres.users[0].password }}"
     host: "{{ postgres.host }}"
     database_name: "{{ postgres.databases[0].name }}"
+  init_scripts: "{{ init_scripts }}"
   services: "{{ services }}"
   env_files: "{{ env_files }}"
   tmpfiles: "{{ tmpfiles }}"
 
-# Override the vars specific to the according role
+# Override the vars specific to the role
 openstax_wsgi_role: "{{ wsgi }}"
 openstax_postgres_role: "{{ postgres }}"
 openstax_ssl_role: "{{ nginx.ssl }}"

@@ -55,6 +55,7 @@ box_vars: &box_env
 hypothesis_vars: &hypothesis_env
   HYPOTHESIS_CLIENT_ID: "{{ wsgi.hypothesis_client_id }}"
   HYPOTHESIS_CLIENT_SECRET: "{{ wsgi.hypothesis_client_secret }}"
+  HYPOTHESIS_SECRET_KEY: "{{ wsgi.hypothesis_secret_key }}"
 
 # Celery env vars
 celery_vars: &celery_env
@@ -69,7 +70,7 @@ celery_vars: &celery_env
 env_vars: &default_env
   <<: *box_env
   <<: *hypothesis_env
-  APP_URL: "{{ application.server_name }}" 
+  APP_URL: "{{ application.server_name }}"
   SECRET_KEY: "{{ wsgi.hypothesis_secret_key }}"
   APP_RUN_OPTS: |
     "--name h \
@@ -111,7 +112,7 @@ init_scripts:
 
 # These are the systemd unitfiles needed to start the main application
 services:
-  gunicorn:
+  h_service:
     application_name: "{{ application.name }}"
     template: lib/systemd/system/application.service
     description: "{{ application.name }} gunicorn service"
@@ -128,9 +129,47 @@ services:
       ExecStart: "{{ virtualenv.bin_dir }}/gunicorn $APP_RUN_OPTS"
       ExecReload: "/bin/kill -s HUP $MAINPID"
       ExecStop: "/bin/kill -s TERM $MAINPID"
-      PrivateTmp: true 
+      PrivateTmp: true
+  h_socket:
+    application_name: "{{ application.name }}.socket"
+    template: lib/systemd/system/application.socket
+    description: "{{ application.name }} gunicorn socket"
+    dest: "/lib/systemd/system/{{ application.name}}.socket"
+    state: present
+    params: 
+      ListenStream: "/tmp/{{ application.name }}.sock"
+  h_worker:
+    application_name: "{{ application.name }}-worker"
+    template: lib/systemd/system/application.service
+    description: "{{ application.name }} gunicorn service"
+    dest: "/lib/systemd/system/{{ application.name}}-worker.service"
+    state: present
+    params: 
+      PIDFile: "{{ application.directory }}/celery.pid"
+      User: "{{ user.name }}"
+      Group: "{{ user.group }}"
+      RuntimeDirectory: celery 
+      WorkingDirectory: "{{ application.directory }}"
+      ExecStart: "{{ application.bin_directory }}/start-celery-worker"
+      ExecReload: "/bin/kill -s HUP $MAINPID"
+      ExecStop: "/bin/kill -s TERM $MAINPID"
+  h_beat:
+    application_name: "{{ application.name }}-beat"
+    template: lib/systemd/system/application.service
+    description: "{{ application.name }} gunicorn service"
+    dest: "/lib/systemd/system/{{ application.name}}-beat.service"
+    state: present
+    params: 
+      PIDFile: "{{ application.directory }}/celeryscheduler.pid"
+      User: "{{ user.name }}"
+      Group: "{{ user.group }}"
+      RuntimeDirectory: celery 
+      WorkingDirectory: "{{ application.directory }}"
+      ExecStart: "{{ application.bin_directory }}/start-celery-beat"
+      ExecReload: "/bin/kill -s HUP $MAINPID"
+      ExecStop: "/bin/kill -s TERM $MAINPID"
 
-# These are the environment files created for the services
+# These are the environment files created for the services which need the env vars
 env_files:
   hypothesis:
     template: etc/default/env
@@ -144,7 +183,6 @@ tmpfiles:
    template: etc/tmpfiles.d/tmpfile
    dest: "/etc/tmpfiles.d/{{ application.name }}.conf"
    tmpfile: "d /tmp/{{ application.name }}.sock 0755 {{ user.name }} {{ user.group }} -"
-
 
 # The vars originally used in this playbook were based on using hashes
 # We are moving away from that so to using "flatter" 
@@ -188,7 +226,6 @@ papertrail_watch_files:
 # we can assume all the other values exist if needed and can be passed into our config
 hypothesis:
   application_name: "{{ application.name }}"
-  init_scripts: "{{ init_scripts }}"
   user: "{{ user.name }}"
   group: "{{ user.group }}"
   server_name: "{{ application.server_name }}"
@@ -208,13 +245,13 @@ hypothesis:
     password: "{{ postgres.users[0].password }}"
     host: "{{ postgres.host }}"
     database_name: "{{ postgres.databases[0].name }}"
+  init_scripts: "{{ init_scripts }}"
   services: "{{ services }}"
   env_files: "{{ env_files }}"
   tmpfiles: "{{ tmpfiles }}"
 
-# Override the vars specific to the according role
+# Override the vars specific to the role
 openstax_wsgi_role: "{{ wsgi }}"
 openstax_postgres_role: "{{ postgres }}"
 openstax_ssl_role: "{{ nginx.ssl }}"
 openstax_hypothesis_role: "{{ hypothesis }}"
-

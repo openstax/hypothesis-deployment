@@ -67,6 +67,10 @@ celery_vars: &celery_env
   CELERY_BEAT_LOG_FILE: "{{ application.log_directory }}/celery-beat.log"
 
 # The default env used in each of the init_scripts for running Hypothesis
+export_vars: &export_env
+  <<: *box_env
+  DATABASE_URL: "postgresql://{{ postgres.databases[0].user }}:{{ postgres.databases[0].password }}@{{ postres.host }}/{{ postgres.databases[0].name }}" 
+
 env_vars: &default_env
   <<: *box_env
   <<: *hypothesis_env
@@ -92,23 +96,33 @@ init_scripts:
   hypothesis:
     template: var/www/h/bin/init_script
     dest: /var/www/h/bin/hypothesis
-    exec: python -m h "$@"
+    exec: exec python -m h "$@"
+    state: present
     env_vars: 
       <<: *default_env
   start_celery_worker:
     template: var/www/h/bin/init_script
     dest: /var/www/h/bin/start-celery-worker
-    exec: "python -m h celery worker --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}" 
+    exec: "exec python -m h celery worker --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}"
+    state: present
     env_vars:
       <<: *default_env
       <<: *celery_env
   start_celery_beat:
     template: var/www/h/bin/init_script
     dest: /var/www/h/bin/start-celery-beat
-    exec: "python -m h celery beat --logfile=${CELERY_BEAT_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}"
+    exec: "exec python -m h celery beat --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}"
+    state: present
     env_vars:
       <<: *default_env
       <<: *celery_env
+  annotation_export:
+    template: var/www/h/bin/init_script
+    dest: /var/www/h/bin/export-annotations
+    exec: "boxex {{ application.directory }}/sql/annotation_export.sql {{ application.server_name }}-$(date '+%Y-%m-%d').csv"
+    state: present
+    env_vars:
+      <<: *export_env
 
 # These are the systemd unitfiles needed to start the main application
 services:
@@ -235,6 +249,7 @@ hypothesis:
   s3_key_name: "{{ ssl_s3_key_name }}" 
   <<: *virtualenv
   virtualenv_bin_dir: "{{ virtualenv.bin_dir }}"
+  virtualenv_python: "{{ virtualenv.python }}"
   client_id: "{{ wsgi.hypothesis_client_id }}" 
   client_secret: "{{ wsgi.hypothesis_client_secret }}"
   secret_key: "{{ wsgi.hypothesis_secret_key }}"  

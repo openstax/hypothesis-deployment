@@ -119,7 +119,7 @@ init_scripts:
   annotation_export:
     template: var/www/h/bin/init_script
     dest: /var/www/h/bin/export-annotations
-    exec: "boxex {{ application.directory }}/sql/annotation_export.sql {{ application.server_name }}-$(date '+%Y-%m-%d').csv"
+    exec: "boxex {{ application.directory }}/sql/annotation_export.sql {{ application.server_name }}-$(date '+%Y-%m-%d:%H:%M').csv"
     state: present
     env_vars:
       <<: *export_env

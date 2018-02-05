@@ -272,10 +272,10 @@ hypothesis:
   box_rsa_private_key_content: "{{ box.rsa_private_key_content }}"
   box_rsa_private_key_path: "{{ box.rsa_private_key_path }}"
   database:
-    user: "{{ postgres.users[0].name }}"
-    password: "{{ postgres.users[0].password }}"
+    user: "{{ pg_users[0].name }}"
+    password: "{{ pg_users[0].password }}"
     host: "{{ pg_host }}"
-    database_name: "{{ postgres.databases[0].name }}"
+    database_name: "{{ pg_databases[0].name }}"
   init_scripts: "{{ init_scripts }}"
   services: "{{ services }}"
   env_files: "{{ env_files }}"

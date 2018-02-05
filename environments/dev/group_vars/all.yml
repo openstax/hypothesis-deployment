@@ -69,7 +69,7 @@ celery_vars: &celery_env
 # The default env used in each of the init_scripts for running Hypothesis
 export_vars: &export_env
   <<: *box_env
-  DATABASE_URL: "postgresql://{{ postgres.databases[0].user }}:{{ postgres.databases[0].password }}@{{ postgres.host }}/{{ postgres.databases[0].name }}" 
+  DATABASE_URL: "postgresql://{{ postgres.databases[0].user }}:{{ postgres.databases[0].password }}@{{ pg_host }}/{{ postgres.databases[0].name }}" 
 
 env_vars: &default_env
   <<: *box_env
@@ -208,15 +208,13 @@ pg_version: 9.6
 pg_is_master_server: true
 
 pg_databases:
-  - name: hypothesis
-    port: 5432
+  - name: "{{ postgres.databases[0].name }}"
 
 pg_users: 
-  - name: hypothesis
+  - name: "{{ postgres.users[0].name }}"
     password:  "{{ postgres.users[0].password }}"
-    db: hypothesis
-    roles:
-      - SUPERUSER
+    db: "{{ postgres.users[0].db }}"
+    roles: "{{ postgres.users[0].roles }}"
 
 # npm
 nodejs_npm_global_packages: ['gulp-cli']

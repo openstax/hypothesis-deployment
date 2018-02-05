@@ -69,7 +69,7 @@ celery_vars: &celery_env
 # The default env used in each of the init_scripts for running Hypothesis
 export_vars: &export_env
   <<: *box_env
-  DATABASE_URL: "postgresql://{{ postgres.databases[0].user }}:{{ postgres.databases[0].password }}@{{ postgres.host }}/{{ postgres.databases[0].name }}" 
+  DATABASE_URL: "postgresql://{{ postgres.databases[0].user }}:{{ postgres.databases[0].password }}@{{ pg_host }}/{{ postgres.databases[0].name }}" 
 
 env_vars: &default_env
   <<: *box_env
@@ -201,6 +201,19 @@ tmpfiles:
 # The vars originally used in this playbook were based on using hashes
 # We are moving away from that so to using "flatter" 
 # namespaced variables that start with rolename_var_name.
+
+# postgresql
+pg_version: 9.6
+pg_is_master_server: true
+
+pg_databases:
+  - name: "{{ postgres.databases[0].name }}"
+
+pg_users: 
+  - name: "{{ postgres.users[0].name }}"
+    password:  "{{ postgres.users[0].password }}"
+    db: "{{ postgres.users[0].db }}"
+    roles: "{{ postgres.users[0].roles }}"
 
 # npm
 nodejs_npm_global_packages: ['gulp-cli']

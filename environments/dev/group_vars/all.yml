@@ -203,6 +203,21 @@ tmpfiles:
 # We are moving away from that so to using "flatter" 
 # namespaced variables that start with rolename_var_name.
 
+# postgresql
+pg_version: 9.6
+pg_is_master_server: true
+
+pg_databases:
+  - name: hypothesis
+    port: 5432
+
+pg_users: 
+  - name: hypothesis
+    password:  "{{ postgres.users[0].password }}"
+    db: hypothesis
+    roles:
+      - SUPERUSER
+
 # npm
 nodejs_npm_global_packages: ['gulp-cli']
 nodejs_install_npm_user: "{{ user.name }}"
@@ -259,7 +274,7 @@ hypothesis:
   database:
     user: "{{ postgres.users[0].name }}"
     password: "{{ postgres.users[0].password }}"
-    host: "{{ postgres.host }}"
+    host: "{{ pg_host }}"
     database_name: "{{ postgres.databases[0].name }}"
   init_scripts: "{{ init_scripts }}"
   services: "{{ services }}"
@@ -268,6 +283,5 @@ hypothesis:
 
 # Override the vars specific to the role
 openstax_wsgi_role: "{{ wsgi }}"
-openstax_postgres_role: "{{ postgres }}"
 openstax_ssl_role: "{{ nginx.ssl }}"
 openstax_hypothesis_role: "{{ hypothesis }}"

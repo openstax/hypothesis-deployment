@@ -205,7 +205,7 @@ tmpfiles:
 # postgresql
 pg_version: 9.6
 pg_rds: true
-pg_is_master_server: false
+pg_is_master_server: true
 pg_admin_user: "{{ postgres.admin_user }}"
 pg_admin_password: "{{ postgres.admin_password }}"
 pg_host: "{{ postgres.host }}"
@@ -215,6 +215,7 @@ pg_databases:
 
 pg_users: 
   - name: "{{ postgres.users[0].name }}"
+    password: "{{ postgres.users[0].password }}"
     db: "{{ postgres.users[0].db }}"
     roles: "{{ postgres.users[0].roles }}"
 

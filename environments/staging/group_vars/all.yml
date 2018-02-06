@@ -69,7 +69,7 @@ celery_vars: &celery_env
 # The default env used in each of the init_scripts for running Hypothesis
 export_vars: &export_env
   <<: *box_env
-  DATABASE_URL: "postgresql://{{ postgres.databases[0].user }}:{{ postgres.databases[0].password }}@{{ postgres.host }}/{{ postgres.databases[0].name }}" 
+  DATABASE_URL: "postgresql://{{ postgres.users[0].name }}:{{ postgres.users[0].password }}@{{ postgres.host }}/{{ postgres.users[0].db }}" 
 
 env_vars: &default_env
   <<: *box_env
@@ -204,7 +204,7 @@ tmpfiles:
 
 # postgresql
 pg_version: 9.6
-pg_is_master_server: true
+pg_rds: true
 pg_admin_user: "{{ postgres.admin_user }}"
 pg_admin_password: "{{ postgres.admin_password }}"
 pg_host: "{{ postgres.host }}"
@@ -231,7 +231,7 @@ ssl_s3_private_key:  ssl/openstax.org/openstax.org.key
 ssl_s3_key_name: openstax.pem
 ssl_s3_aws_secret_access_key: "{{ aws.secret_access_key }}"
 ssl_s3_aws_access_key_id: "{{ aws.access_key_id }}"
-ssl_cert_file_name: openstax.crt
+ssl_cert_file_name: openstax
 ssl_copy: ~
 
 # papertrail
@@ -273,8 +273,8 @@ hypothesis:
   database:
     user: "{{ postgres.users[0].name }}"
     password: "{{ postgres.users[0].password }}"
-    host: "{{ postgres.users[0].host }}"
-    database_name: "{{ postgres.databases[0].db }}"
+    host: "{{ postgres.host }}"
+    database_name: "{{ postgres.users[0].db }}"
   init_scripts: "{{ init_scripts }}"
   services: "{{ services }}"
   env_files: "{{ env_files }}"
@@ -282,6 +282,4 @@ hypothesis:
 
 # Override the vars specific to the role
 openstax_wsgi_role: "{{ wsgi }}"
-openstax_postgres_role: "{{ postgres }}"
-openstax_ssl_role: "{{ nginx.ssl }}"
 openstax_hypothesis_role: "{{ hypothesis }}"

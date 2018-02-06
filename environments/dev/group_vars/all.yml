@@ -69,7 +69,7 @@ celery_vars: &celery_env
 # The default env used in each of the init_scripts for running Hypothesis
 export_vars: &export_env
   <<: *box_env
-  DATABASE_URL: "postgresql://{{ postgres.databases[0].user }}:{{ postgres.databases[0].password }}@{{ pg_host }}/{{ postgres.databases[0].name }}" 
+  DATABASE_URL: "postgresql://{{ postgres.users[0].name }}:{{ postgres.users[0].password }}@{{ postgres.host }}/{{ postgres.users[0].db }}" 
 
 env_vars: &default_env
   <<: *box_env
@@ -206,6 +206,7 @@ tmpfiles:
 # postgresql
 pg_version: 9.6
 pg_is_master_server: true
+pg_host: "{{ postgres.host }}"
 
 pg_databases:
   - name: "{{ postgres.databases[0].name }}"
@@ -281,5 +282,4 @@ hypothesis:
 
 # Override the vars specific to the role
 openstax_wsgi_role: "{{ wsgi }}"
-openstax_ssl_role: "{{ nginx.ssl }}"
 openstax_hypothesis_role: "{{ hypothesis }}"

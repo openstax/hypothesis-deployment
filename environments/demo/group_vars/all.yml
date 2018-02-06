@@ -69,7 +69,7 @@ celery_vars: &celery_env
 # The default env used in each of the init_scripts for running Hypothesis
 export_vars: &export_env
   <<: *box_env
-  DATABASE_URL: "postgresql://{{ postgres.databases[0].user }}:{{ postgres.databases[0].password }}@{{ postgres.host }}/{{ postgres.databases[0].name }}" 
+  DATABASE_URL: "postgresql://{{ postgres.users[0].name }}:{{ postgres.users[0].password }}@{{ postgres.host | default(pg_host) }}/{{ postgres.users[0].db }}" 
 
 env_vars: &default_env
   <<: *box_env
@@ -203,6 +203,9 @@ tmpfiles:
 # We are moving away from that so to using "flatter" 
 # namespaced variables that start with rolename_var_name.
 
+# pip
+pip_package: python3-pip
+
 # postgresql
 pg_version: 9.6
 pg_is_master_server: true
@@ -214,7 +217,6 @@ pg_users:
   - name: "{{ postgres.users[0].name }}"
     password:  "{{ postgres.users[0].password }}"
     db: "{{ postgres.users[0].db }}"
-    roles: "{{ postgres.users[0].roles }}"
 
 # npm
 nodejs_npm_global_packages: ['gulp-cli']
@@ -230,7 +232,7 @@ ssl_s3_private_key:  ssl/openstax.org/openstax.org.key
 ssl_s3_key_name: openstax.pem
 ssl_s3_aws_secret_access_key: "{{ aws.secret_access_key }}"
 ssl_s3_aws_access_key_id: "{{ aws.access_key_id }}"
-ssl_cert_file_name: openstax.crt
+ssl_cert_file_name: openstax
 ssl_copy: ~
 
 # papertrail

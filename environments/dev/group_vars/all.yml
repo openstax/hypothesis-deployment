@@ -69,7 +69,7 @@ celery_vars: &celery_env
 # The default env used in each of the init_scripts for running Hypothesis
 export_vars: &export_env
   <<: *box_env
-  DATABASE_URL: "postgresql://{{ postgres.databases[0].user }}:{{ postgres.databases[0].password }}@{{ postgres.host }}/{{ postgres.databases[0].name }}" 
+  DATABASE_URL: "postgresql://{{ postgres.users[0].name }}:{{ postgres.users[0].password }}@{{ postgres.host }}/{{ postgres.users[0].db }}" 
 
 env_vars: &default_env
   <<: *box_env
@@ -203,6 +203,20 @@ tmpfiles:
 # We are moving away from that so to using "flatter" 
 # namespaced variables that start with rolename_var_name.
 
+# postgresql
+pg_version: 9.6
+pg_is_master_server: true
+pg_host: "{{ postgres.host }}"
+
+pg_databases:
+  - name: "{{ postgres.databases[0].name }}"
+
+pg_users: 
+  - name: "{{ postgres.users[0].name }}"
+    password:  "{{ postgres.users[0].password }}"
+    db: "{{ postgres.users[0].db }}"
+    roles: "{{ postgres.users[0].roles }}"
+
 # npm
 nodejs_npm_global_packages: ['gulp-cli']
 nodejs_install_npm_user: "{{ user.name }}"
@@ -257,10 +271,10 @@ hypothesis:
   box_rsa_private_key_content: "{{ box.rsa_private_key_content }}"
   box_rsa_private_key_path: "{{ box.rsa_private_key_path }}"
   database:
-    user: "{{ postgres.users[0].name }}"
-    password: "{{ postgres.users[0].password }}"
-    host: "{{ postgres.host }}"
-    database_name: "{{ postgres.databases[0].name }}"
+    user: "{{ pg_users[0].name }}"
+    password: "{{ pg_users[0].password }}"
+    host: "{{ pg_host }}"
+    database_name: "{{ pg_databases[0].name }}"
   init_scripts: "{{ init_scripts }}"
   services: "{{ services }}"
   env_files: "{{ env_files }}"
@@ -268,6 +282,4 @@ hypothesis:
 
 # Override the vars specific to the role
 openstax_wsgi_role: "{{ wsgi }}"
-openstax_postgres_role: "{{ postgres }}"
-openstax_ssl_role: "{{ nginx.ssl }}"
 openstax_hypothesis_role: "{{ hypothesis }}"

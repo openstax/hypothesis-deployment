@@ -8,11 +8,11 @@ application:
   access_log: /var/www/h/logs/access.log
   worker_log: /var/www/h/logs/celery.log
   celery_beat_log: /var/www/h/logs/celery-beat.log
-  server_name: hstaging.openstax.org
+  server_name: hdemo.openstax.org
   nginx_conf: /etc/nginx/sites-available/site-available.conf
 
 user:
-  name: hstaging
+  name: hdemo
   group: www-data
   home: /var/www/h
 
@@ -69,7 +69,7 @@ celery_vars: &celery_env
 # The default env used in each of the init_scripts for running Hypothesis
 export_vars: &export_env
   <<: *box_env
-  DATABASE_URL: "postgresql://{{ postgres.users[0].name }}:{{ postgres.users[0].password }}@{{ postgres.host }}/{{ postgres.users[0].db }}" 
+  DATABASE_URL: "postgresql://{{ postgres.users[0].name }}:{{ postgres.users[0].password }}@{{ postgres.host | default(pg_host) }}/{{ postgres.users[0].db }}" 
 
 env_vars: &default_env
   <<: *box_env
@@ -103,7 +103,7 @@ init_scripts:
   start_celery_worker:
     template: var/www/h/bin/init_script
     dest: /var/www/h/bin/start-celery-worker
-    exec: "exec python -m h celery worker --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}"
+    exec: "exec python -m h celery worker --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}" 
     state: present
     env_vars:
       <<: *default_env
@@ -111,7 +111,7 @@ init_scripts:
   start_celery_beat:
     template: var/www/h/bin/init_script
     dest: /var/www/h/bin/start-celery-beat
-    exec: "exec python -m h celery beat --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}"
+    exec: "exec python -m h celery beat --logfile=${CELERY_BEAT_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}"
     state: present
     env_vars:
       <<: *default_env
@@ -182,8 +182,9 @@ services:
       ExecStart: "{{ application.bin_directory }}/start-celery-beat"
       ExecReload: "/bin/kill -s HUP $MAINPID"
       ExecStop: "/bin/kill -s TERM $MAINPID"
+      PrivateTmp: true 
 
-# These are the environment files created for the services which need the env vars
+# These are the environment files created for the services
 env_files:
   hypothesis:
     template: etc/default/env
@@ -202,13 +203,12 @@ tmpfiles:
 # We are moving away from that so to using "flatter" 
 # namespaced variables that start with rolename_var_name.
 
+# pip
+pip_package: python3-pip
+
 # postgresql
 pg_version: 9.6
-pg_rds: true
 pg_is_master_server: true
-pg_admin_user: "{{ postgres.admin_user }}"
-pg_admin_password: "{{ postgres.admin_password }}"
-pg_host: "{{ postgres.host }}"
 
 pg_databases:
   - name: "{{ postgres.databases[0].name }}"
@@ -217,7 +217,6 @@ pg_users:
   - name: "{{ postgres.users[0].name }}"
     password:  "{{ postgres.users[0].password }}"
     db: "{{ postgres.users[0].db }}"
-    roles: "{{ postgres.users[0].roles }}"
 
 # npm
 nodejs_npm_global_packages: ['gulp-cli']
@@ -273,10 +272,10 @@ hypothesis:
   box_rsa_private_key_content: "{{ box.rsa_private_key_content }}"
   box_rsa_private_key_path: "{{ box.rsa_private_key_path }}"
   database:
-    user: "{{ postgres.users[0].name }}"
-    password: "{{ postgres.users[0].password }}"
-    host: "{{ postgres.host }}"
-    database_name: "{{ postgres.users[0].db }}"
+    user: "{{ pg_users[0].name }}"
+    password: "{{ pg_users[0].password }}"
+    host: "{{ pg_host }}"
+    database_name: "{{ pg_databases[0].name }}"
   init_scripts: "{{ init_scripts }}"
   services: "{{ services }}"
   env_files: "{{ env_files }}"
@@ -284,4 +283,5 @@ hypothesis:
 
 # Override the vars specific to the role
 openstax_wsgi_role: "{{ wsgi }}"
+openstax_ssl_role: "{{ nginx.ssl }}"
 openstax_hypothesis_role: "{{ hypothesis }}"

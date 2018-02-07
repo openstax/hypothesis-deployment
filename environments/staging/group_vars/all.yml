@@ -217,7 +217,6 @@ pg_users:
   - name: "{{ postgres.users[0].name }}"
     password:  "{{ postgres.users[0].password }}"
     db: "{{ postgres.users[0].db }}"
-    roles: "{{ postgres.users[0].roles }}"
 
 # npm
 nodejs_npm_global_packages: ['gulp-cli']

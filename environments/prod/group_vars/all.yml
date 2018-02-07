@@ -216,7 +216,6 @@ pg_databases:
 pg_users: 
   - name: "{{ postgres.users[0].name }}"
     db: "{{ postgres.users[0].db }}"
-    roles: "{{ postgres.users[0].roles }}"
 
 # npm
 nodejs_npm_global_packages: ['gulp-cli']
@@ -283,6 +282,4 @@ hypothesis:
 
 # Override the vars specific to the role
 openstax_wsgi_role: "{{ wsgi }}"
-openstax_postgres_role: "{{ postgres }}"
-openstax_ssl_role: "{{ nginx.ssl }}"
 openstax_hypothesis_role: "{{ hypothesis }}"

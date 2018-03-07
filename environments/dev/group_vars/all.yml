@@ -16,18 +16,12 @@ user:
   group: www-data
   home: /var/www/h
 
-github:
-  pubkey: /var/lib/rundeck/.ssh/github.id_rsa.pub
-  privkey: /var/lib/rundeck/.ssh/github.id_rsa
-  user: openstax-bot
-  email: devops@cnx.org
-
 virtualenv: &virtualenv
   name: "{{ application.name }}"
   python: /usr/bin/python
   base: "{{ application.directory }}/.env"
   requirements_path: "{{ application.directory }}/requirements-dev.in"
-  bin_dir: "{{ application.directory }}/.env/bin" 
+  bin_dir: "{{ application.directory }}/.env/bin"
 
 nginx:
   access_log: /var/log/nginx/access.log
@@ -35,11 +29,11 @@ nginx:
   sites:
     - name: hypothesis
 
-# With some of the more application specific things defined we are going to 
+# With some of the more application specific things defined we are going to
 # start creating the groups of different environmental variables we'll need
 # to run our application. YAML anchors are used to reduce the need to duplicate
 # these values. They are set once at the top of the file and then overwritten
-# when necessary. 
+# when necessary.
 
 # rice.app.box.com values in order to do the annotation export
 box_vars: &box_env
@@ -69,7 +63,7 @@ celery_vars: &celery_env
 # The default env used in each of the init_scripts for running Hypothesis
 export_vars: &export_env
   <<: *box_env
-  DATABASE_URL: "postgresql://{{ postgres.users[0].name }}:{{ postgres.users[0].password }}@{{ postgres.host }}/{{ postgres.users[0].db }}" 
+  DATABASE_URL: "postgresql://{{ postgres.users[0].name }}:{{ postgres.users[0].password }}@{{ postgres.host }}/{{ postgres.users[0].db }}"
 
 env_vars: &default_env
   <<: *box_env
@@ -82,15 +76,15 @@ env_vars: &default_env
       --capture-output \
       --error-logfile /var/www/h/logs/error.log \
       --access-logfile /var/www/h/logs/access.log \
-      --bind unix:/tmp/h.sock" 
-  WEBSOCKET_RUN_OPTS: | 
+      --bind unix:/tmp/h.sock"
+  WEBSOCKET_RUN_OPTS: |
     "--name h-websocket \
       --paste /var/www/h/conf/websocket.ini \
       --error-logfile /var/www/h/logs/websocket-error.log \
       --access-logfile /var/www/h/logs/websocket-access.log \
       --bind unix:/tmp/h-websocket.sock"
 
-# These scripts are placed in the application bin directory 
+# These scripts are placed in the application bin directory
 # and utilized by systemd to start the app and workers
 init_scripts:
   hypothesis:
@@ -98,12 +92,12 @@ init_scripts:
     dest: /var/www/h/bin/hypothesis
     exec: exec python -m h "$@"
     state: present
-    env_vars: 
+    env_vars:
       <<: *default_env
   start_celery_worker:
     template: var/www/h/bin/init_script
     dest: /var/www/h/bin/start-celery-worker
-    exec: "exec python -m h celery worker --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}" 
+    exec: "exec python -m h celery worker --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}"
     state: present
     env_vars:
       <<: *default_env
@@ -133,7 +127,7 @@ services:
     dest: "/lib/systemd/system/{{ application.name}}.service"
     requires: h.socket
     state: present
-    params: 
+    params:
       EnvironmentFile: "-/etc/default/{{ application.name }}"
       PIDFile: "/run/gunicorn/{{ application.name }}-pid"
       User: "{{ user.name }}"
@@ -150,7 +144,7 @@ services:
     description: "{{ application.name }} gunicorn socket"
     dest: "/lib/systemd/system/{{ application.name}}.socket"
     state: present
-    params: 
+    params:
       ListenStream: "/tmp/{{ application.name }}.sock"
   h_worker:
     application_name: "{{ application.name }}-worker"
@@ -158,11 +152,11 @@ services:
     description: "{{ application.name }} gunicorn service"
     dest: "/lib/systemd/system/{{ application.name}}-worker.service"
     state: present
-    params: 
+    params:
       PIDFile: "{{ application.directory }}/celery.pid"
       User: "{{ user.name }}"
       Group: "{{ user.group }}"
-      RuntimeDirectory: celery 
+      RuntimeDirectory: celery
       WorkingDirectory: "{{ application.directory }}"
       ExecStart: "{{ application.bin_directory }}/start-celery-worker"
       ExecReload: "/bin/kill -s HUP $MAINPID"
@@ -173,16 +167,16 @@ services:
     description: "{{ application.name }} gunicorn service"
     dest: "/lib/systemd/system/{{ application.name}}-beat.service"
     state: present
-    params: 
+    params:
       PIDFile: "{{ application.directory }}/celeryscheduler.pid"
       User: "{{ user.name }}"
       Group: "{{ user.group }}"
-      RuntimeDirectory: celery 
+      RuntimeDirectory: celery
       WorkingDirectory: "{{ application.directory }}"
       ExecStart: "{{ application.bin_directory }}/start-celery-beat"
       ExecReload: "/bin/kill -s HUP $MAINPID"
       ExecStop: "/bin/kill -s TERM $MAINPID"
-      PrivateTmp: true 
+      PrivateTmp: true
 
 # These are the environment files created for the services
 env_files:
@@ -200,18 +194,29 @@ tmpfiles:
    tmpfile: "d /tmp/{{ application.name }}.sock 0755 {{ user.name }} {{ user.group }} -"
 
 # The vars originally used in this playbook were based on using hashes
-# We are moving away from that so to using "flatter" 
+# We are moving away from that so to using "flatter"
 # namespaced variables that start with rolename_var_name.
+
+# pip
+pip_package: python3-pip
+
+# github
+gh_repo: https://github.com/openstax/hypothesis-server.git
+gh_dest_dir: "{{ application.directory }}"
+gh_dest_dir_user: "{{ user.name }}"
+gh_dest_dir_group: "{{ user.group }}"
 
 # postgresql
 pg_version: 9.6
 pg_is_master_server: true
 pg_host: "{{ postgres.host }}"
+pg_extra_packages:
+  - python3-psycopg2
 
 pg_databases:
   - name: "{{ postgres.databases[0].name }}"
 
-pg_users: 
+pg_users:
   - name: "{{ postgres.users[0].name }}"
     password:  "{{ postgres.users[0].password }}"
     db: "{{ postgres.users[0].db }}"
@@ -236,7 +241,7 @@ ssl_copy: ~
 # papertrail
 papertrail_url: "{{ papertrail.url }}"
 papertrail_ssl_dest_cert_dir: "{{ ssl_dest_cert_dir }}"
-papertrail_watch_files: 
+papertrail_watch_files:
   - path: "{{ application.access_log }}"
     unique_name: "{{ application.name }}_access"
   - path: "{{ application.error_log }}"
@@ -260,13 +265,13 @@ hypothesis:
   application_dir: "{{ application.directory }}"
   ssl_on: yes
   ssl_cert_file_name: "{{ ssl_cert_file_name }}"
-  s3_key_name: "{{ ssl_s3_key_name }}" 
+  s3_key_name: "{{ ssl_s3_key_name }}"
   <<: *virtualenv
   virtualenv_bin_dir: "{{ virtualenv.bin_dir }}"
   virtualenv_python: "{{ virtualenv.python }}"
-  client_id: "{{ wsgi.hypothesis_client_id }}" 
+  client_id: "{{ wsgi.hypothesis_client_id }}"
   client_secret: "{{ wsgi.hypothesis_client_secret }}"
-  secret_key: "{{ wsgi.hypothesis_secret_key }}"  
+  secret_key: "{{ wsgi.hypothesis_secret_key }}"
   box_rsa_private_key_content: "{{ box.rsa_private_key_content }}"
   box_rsa_private_key_path: "{{ box.rsa_private_key_path }}"
   database:

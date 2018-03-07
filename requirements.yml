@@ -10,6 +10,9 @@
 - src: https://github.com/openstax/ansible-role-nodejs.git
   version: master
   name: openstax.nodejs
+- src: https://github.com/openstax/ansible-github.git
+  version: master
+  name: openstax.github
 - src: https://github.com/openstax/ansible-role-wsgi.git
   version: master
   name: openstax.wsgi

@@ -1,22 +1,27 @@
 ---
 - name: OpenStax Hypothesis Deployment
-  hosts: hypothesis 
+  hosts: hypothesis
+  pre_tasks:
+    - import_tasks: tasks/app_user.yml
   roles:
     - role: openstax.common
-      tags: common
+      tags:
+        - common
     - role: openstax.nginx
-      tags: nginx
+      tags:
+        - nginx
     - role: openstax.postgres
-      tags: postgres
+      tags:
+        - postgres
     - role: openstax.rabbitmq
-      tags: rabbitmq
-    - role: openstax.wsgi
-      tags: wsgi
-    - role: openstax.nodejs
-      tags: nodejs
+      tags:
+        - rabbitmq
     - role: openstax.elasticsearch
-      tags: elasticsearch
+      tags:
+        - elasticsearch
     - role: openstax.hypothesis
-      tags: hypothesis-app
+      tags:
+        - hypothesis-app
     - role: openstax.papertrail
-      tags: papertrail
+      tags:
+        - papertrail

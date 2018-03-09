@@ -34,6 +34,9 @@
 - src: https://github.com/openstax/ansible-role-papertrail.git
   version: master
   name: openstax.papertrail
-- src: https://github.com/openstax/ansible-role-hypothesis.git
+- src: https://github.com/openstax/ansible-hypothesis.git
   version: master
   name: openstax.hypothesis
+- src: https://github.com/openstax/ansible-github.git
+  version: master
+  name: openstax.github

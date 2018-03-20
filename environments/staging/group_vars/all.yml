@@ -54,6 +54,8 @@ h_env: &h_env
   AUTHORITY: "{{ h_authority }}"
   CLIENT_ID: "{{ h_client_id }}"
   CLIENT_SECRET: "{{ h_client_secret }}"
+  PYTHONPATH: "{{ h_virtualenv_base }}/bin"
+  PATH: "{{ h_virtualenv_base }}/bin:usr/local/bin:/usr/bin:/bin"
 
 # Celery env vars
 celery_env: &celery_env
@@ -61,6 +63,7 @@ celery_env: &celery_env
   CELERYD_LOG_FILE: "{{ h_log_directory }}/celery.log"
   CELERYD_LOG_LEVEL: INFO
   CELERY_BEAT_LOG_FILE: "{{ h_log_directory }}/celery-beat.log"
+
 
 h_env_files:
   hypothesis:

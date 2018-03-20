@@ -201,6 +201,7 @@ nginx_vhosts:
 
 # postgresql
 pg_version: 9.6
+pg_rds: true
 pg_is_master_server: true
 pg_host: "{{ postgres.host }}"
 pg_extra_packages:

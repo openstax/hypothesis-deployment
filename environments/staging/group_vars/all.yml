@@ -204,6 +204,8 @@ nginx_vhosts:
 pg_version: 9.6
 pg_rds: true
 pg_is_master_server: true
+pg_admin_user: "{{ postgres.admin_user }}"
+pg_admin_password: "{{ postgres.admin_password }}"
 pg_host: "{{ postgres.host }}"
 pg_extra_packages:
   - python3-psycopg2

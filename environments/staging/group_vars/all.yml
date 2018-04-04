@@ -26,7 +26,7 @@ h_secret_key: "{{ wsgi.hypothesis_secret_key }}"
 h_db_user: "{{ postgres.users[0].name }}"
 h_db_password: "{{ postgres.users[0].password }}"
 h_db_name: "{{ postgres.databases[0].name }}"
-h_db_host: localhost
+h_db_host: "{{ posgres.host }}"
 h_db_url: "postgresql://{{ h_db_user }}:{{ h_db_password }}@{{ h_db_host }}/{{ h_db_name }}"
 
 # vars used specifically for box exporter which exports data to box for researchers

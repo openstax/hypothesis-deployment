@@ -1,225 +1,223 @@
-# main application vars
-application:
-  name: h
-  directory: /var/www/h
-  bin_directory: /var/www/h/bin
-  log_directory: /var/www/h/logs
-  error_log: /var/www/h/logs/error.log
-  access_log: /var/www/h/logs/access.log
-  worker_log: /var/www/h/logs/celery.log
-  celery_beat_log: /var/www/h/logs/celery-beat.log
-  server_name: hqa.openstax.org
-  nginx_conf: /etc/nginx/sites-available/site-available.conf
 
-user:
-  name: hqa
-  group: www-data
-  home: /var/www/h
+# hypothesis role vars
+h_application_name: h
+h_user: hqa
+h_user_group: www-data
+h_directory: "/var/www/{{ h_application_name }}"
+h_conf_directory: "{{ h_directory }}/conf"
+h_bin_directory: "{{ h_directory }}/bin"
+h_log_directory: "/var/log/{{ h_application_name }}"
+h_conf_template: conf/app.ini.j2
+h_error_log: "{{ h_log_directory }}/error.log"
+h_access_log: "{{ h_log_directory }}/access.log"
+h_worker_log: "{{ h_log_directory }}/celery.log"
+h_celery_beat_log: "{{ h_log_directory }}/celery-beat-log.log"
+h_app_url: hqa.openstax.org
 
-github:
-  pubkey: /var/lib/rundeck/.ssh/github.id_rsa.pub
-  privkey: /var/lib/rundeck/.ssh/github.id_rsa
-  user: openstax-bot
-  email: devops@cnx.org
+h_virtualenv_base: "{{ h_directory }}/.env"
+h_virtualenv_python: /usr/bin/python
+h_virtualenv_requirements_path: "{{ h_directory }}/requirements-dev.in"
 
-virtualenv: &virtualenv
-  name: "{{ application.name }}"
-  python: /usr/bin/python
-  base: "{{ application.directory }}/.env"
-  requirements_path: "{{ application.directory }}/requirements-dev.in"
-  bin_dir: "{{ application.directory }}/.env/bin" 
+h_authority: openstax.org
+h_client_id: "{{ wsgi.hypothesis_client_id }}"
+h_client_secret: "{{ wsgi.hypothesis_client_secret }}"
+h_secret_key: "{{ wsgi.hypothesis_secret_key }}"
 
-nginx:
-  access_log: /var/log/nginx/access.log
-  error_log: /var/log/nginx/error.log
-  sites:
-    - name: hypothesis
+h_db_user: "{{ postgres.users[0].name }}"
+h_db_password: "{{ postgres.users[0].password }}"
+h_db_name: "{{ postgres.databases[0].name }}"
+h_db_host: localhost
+h_db_url: "postgresql://{{ h_db_user }}:{{ h_db_password }}@{{ h_db_host }}/{{ h_db_name }}"
 
-# With some of the more application specific things defined we are going to 
-# start creating the groups of different environmental variables we'll need
-# to run our application. YAML anchors are used to reduce the need to duplicate
-# these values. They are set once at the top of the file and then overwritten
-# when necessary. 
+# vars used specifically for box exporter which exports data to box for researchers
+h_box_exporter_enabled: true
+h_box_exporter_home: /opt/box_exporter
+h_box_exporter_query_file: annotation-query.sql
+h_box_exporter_script_file: annotation-export.sh
+h_box_client_id: "{{ box.client_id }}"
+h_box_client_secret: "{{ box.client_secret }}"
+h_box_folder_id: "{{ box.folder_id }}"
+h_box_rsa_private_key_pass: "{{ box.rsa_private_key_pass }}"
+h_box_rsa_private_key_path: "{{ box.rsa_private_key_path }}"
+h_box_rsa_private_key_content: "{{ box.rsa_private_key_content }}"
+h_box_jwt_key_id: "{{ box.jwt_key_id }}"
+h_box_enterprise_id: "{{ box.enterprise_id }}"
 
-# rice.app.box.com values in order to do the annotation export
-box_vars: &box_env
-  BOX_CLIENT_ID: "{{ box.client_id }}"
-  BOX_CLIENT_SECRET: "{{ box.client_secret }}"
-  BOX_FOLDER_ID: "{{ box.folder_id }}"
-  BOX_RSA_PRIVATE_KEY_PASS: "{{ box.rsa_private_key_pass }}"
-  BOX_RSA_PRIVATE_KEY_PATH: "{{ box.rsa_private_key_path }}"
-  BOX_JWT_KEY_ID: "{{ box.jwt_key_id }}"
-  BOX_ENTERPRISE_ID: "{{ box.enterprise_id }}"
-
-# Hypothesis env vars
-hypothesis_vars: &hypothesis_env
-  HYPOTHESIS_CLIENT_ID: "{{ wsgi.hypothesis_client_id }}"
-  HYPOTHESIS_CLIENT_SECRET: "{{ wsgi.hypothesis_client_secret }}"
-  HYPOTHESIS_SECRET_KEY: "{{ wsgi.hypothesis_secret_key }}"
+# h application environment variables
+h_env: &h_env
+  APP_URL: "{{ h_app_url }}"
+  BROKER_URL: amqp://guest:guest@localhost:5672//
+  SECRET_KEY: "{{ h_secret_key }}"
+  DATABASE_URL: "{{ h_db_url }}"
+  ELASTICSEARCH_HOST: http://localhost:9200
+  ELASTICSEARCH_INDEX: hypothesis
+  AUTHORITY: "{{ h_authority }}"
+  CLIENT_ID: "{{ h_client_id }}"
+  CLIENT_SECRET: "{{ h_client_secret }}"
+  PYTHONPATH: "{{ h_virtualenv_base }}/bin"
+  PATH: "{{ h_virtualenv_base }}/bin:usr/local/bin:/usr/bin:/bin"
 
 # Celery env vars
-celery_vars: &celery_env
-  CELERY_BROKER_URL: "amqp://guest:guest@localhost/%2f"
-  CELERY_RESULT_BACKEND: "amqp://"
-  CELERYD_PID_FILE: "{{ application.directory }}/celery.pid"
-  CELERYD_LOG_FILE: "{{ application.log_directory }}/celery.log"
+celery_env: &celery_env
+  CELERYD_PID_FILE: "{{ h_directory }}/celery.pid"
+  CELERYD_LOG_FILE: "{{ h_log_directory }}/celery.log"
   CELERYD_LOG_LEVEL: INFO
-  CELERY_BEAT_LOG_FILE: "{{ application.log_directory }}/celery-beat.log"
+  CELERY_BEAT_LOG_FILE: "{{ h_log_directory }}/celery-beat.log"
 
-# The default env used in each of the init_scripts for running Hypothesis
-export_vars: &export_env
-  <<: *box_env
-  DATABASE_URL: "postgresql://{{ postgres.users[0].name }}:{{ postgres.users[0].password }}@{{ postgres.host }}/{{ postgres.users[0].db }}" 
-
-env_vars: &default_env
-  <<: *box_env
-  <<: *hypothesis_env
-  APP_URL: "{{ application.server_name }}"
-  SECRET_KEY: "{{ wsgi.hypothesis_secret_key }}"
-  APP_RUN_OPTS: |
-    "--name h \
-      --paste /var/www/h/conf/app.ini \
-      --capture-output \
-      --error-logfile /var/www/h/logs/error.log \
-      --access-logfile /var/www/h/logs/access.log \
-      --bind unix:/tmp/h.sock" 
-  WEBSOCKET_RUN_OPTS: | 
-    "--name h-websocket \
-      --paste /var/www/h/conf/websocket.ini \
-      --error-logfile /var/www/h/logs/websocket-error.log \
-      --access-logfile /var/www/h/logs/websocket-access.log \
-      --bind unix:/tmp/h-websocket.sock"
-
-# These scripts are placed in the application bin directory 
-# and utilized by systemd to start the app and workers
-init_scripts:
+h_env_files:
   hypothesis:
-    template: var/www/h/bin/init_script
-    dest: /var/www/h/bin/hypothesis
-    exec: exec python -m h "$@"
-    state: present
-    env_vars: 
-      <<: *default_env
-  start_celery_worker:
-    template: var/www/h/bin/init_script
-    dest: /var/www/h/bin/start-celery-worker
-    exec: "exec python -m h celery worker --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}" 
-    state: present
+    template: etc/default/env.j2
+    dest: /etc/default/h
     env_vars:
-      <<: *default_env
+      <<: *h_env
       <<: *celery_env
-  start_celery_beat:
-    template: var/www/h/bin/init_script
-    dest: /var/www/h/bin/start-celery-beat
-    exec: "exec python -m h celery beat --logfile=${CELERY_BEAT_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL}"
-    state: present
-    env_vars:
-      <<: *default_env
-      <<: *celery_env
-  annotation_export:
-    template: var/www/h/bin/init_script
-    dest: /var/www/h/bin/export-annotations
-    exec: "boxex {{ application.directory }}/sql/annotation_export.sql {{ application.server_name }}-$(date '+%Y-%m-%d:%H:%M').csv"
-    state: present
-    env_vars:
-      <<: *export_env
+      APP_RUN_OPTS: |
+        "--name h \
+          --paste {{ h_conf_directory }}/app.ini \
+          --capture-output \
+          --error-logfile {{ h_error_log }} \
+          --access-logfile {{ h_access_log }} \
+          --bind unix:/tmp/h.sock"
 
-# These are the systemd unitfiles needed to start the main application
-services:
+#  set permissions on the tmp files
+h_tmpfilesd:
+ h_socket:
+   template: etc/tmpfiles.d/tmpfile.conf.j2
+   dest: "/etc/tmpfiles.d/{{ h_application_name }}.conf"
+   tmpfile: "d /tmp/{{ h_application_name }}.sock 0755 {{ h_user }} {{ h_user_group }} -"
+
+# Add service files for the h application
+h_services:
   h_service:
-    application_name: "{{ application.name }}"
-    template: lib/systemd/system/application.service
-    description: "{{ application.name }} gunicorn service"
-    dest: "/lib/systemd/system/{{ application.name}}.service"
+    application_name: "{{ h_application_name }}"
+    template: lib/systemd/system/application.service.j2
+    description: "{{ h_application_name }} gunicorn service"
+    dest: "/lib/systemd/system/{{ h_application_name}}.service"
     requires: h.socket
     state: present
-    params: 
-      EnvironmentFile: "-/etc/default/{{ application.name }}"
-      PIDFile: "/run/gunicorn/{{ application.name }}-pid"
-      User: "{{ user.name }}"
-      Group: "{{ user.group }}"
+    params:
+      EnvironmentFile: "-/etc/default/{{ h_application_name }}"
+      PIDFile: "/run/gunicorn/{{ h_application_name }}-pid"
+      User: "{{ h_user }}"
+      Group: "{{ h_user_group }}"
       RuntimeDirectory: gunicorn
-      WorkingDirectory: "{{ application.directory }}"
-      ExecStart: "{{ virtualenv.bin_dir }}/gunicorn $APP_RUN_OPTS"
+      WorkingDirectory: "{{ h_directory }}"
+      ExecStart: "{{ h_virtualenv_base }}/bin/gunicorn $APP_RUN_OPTS"
       ExecReload: "/bin/kill -s HUP $MAINPID"
       ExecStop: "/bin/kill -s TERM $MAINPID"
       PrivateTmp: true
   h_socket:
-    application_name: "{{ application.name }}.socket"
-    template: lib/systemd/system/application.socket
-    description: "{{ application.name }} gunicorn socket"
-    dest: "/lib/systemd/system/{{ application.name}}.socket"
+    application_name: "{{ h_application_name }}.socket"
+    template: lib/systemd/system/application.socket.j2
+    description: "{{ h_application_name }} gunicorn socket"
+    dest: "/lib/systemd/system/{{ h_application_name}}.socket"
     state: present
-    params: 
-      ListenStream: "/tmp/{{ application.name }}.sock"
+    params:
+      ListenStream: "/tmp/{{ h_application_name }}.sock"
   h_worker:
-    application_name: "{{ application.name }}-worker"
-    template: lib/systemd/system/application.service
-    description: "{{ application.name }} gunicorn service"
-    dest: "/lib/systemd/system/{{ application.name}}-worker.service"
+    application_name: "{{ h_application_name }}-worker"
+    template: lib/systemd/system/application.service.j2
+    description: "{{ h_application_name }} gunicorn service"
+    dest: "/lib/systemd/system/{{ h_application_name}}-worker.service"
     state: present
-    params: 
-      PIDFile: "{{ application.directory }}/celery.pid"
-      User: "{{ user.name }}"
-      Group: "{{ user.group }}"
-      RuntimeDirectory: celery 
-      WorkingDirectory: "{{ application.directory }}"
-      ExecStart: "{{ application.bin_directory }}/start-celery-worker"
+    params:
+      EnvironmentFile: "-/etc/default/{{ h_application_name }}"
+      PIDFile: "{{ h_directory }}/celery.pid"
+      User: "{{ h_user }}"
+      Group: "{{ h_user_group }}"
+      RuntimeDirectory: celery
+      WorkingDirectory: "{{ h_directory }}"
+      ExecStart: "{{ h_bin_directory }}/hypothesis celery worker"
       ExecReload: "/bin/kill -s HUP $MAINPID"
       ExecStop: "/bin/kill -s TERM $MAINPID"
   h_beat:
-    application_name: "{{ application.name }}-beat"
-    template: lib/systemd/system/application.service
-    description: "{{ application.name }} gunicorn service"
-    dest: "/lib/systemd/system/{{ application.name}}-beat.service"
+    application_name: "{{ h_application_name }}-beat"
+    template: lib/systemd/system/application.service.j2
+    description: "{{ h_application_name }} gunicorn service"
+    dest: "/lib/systemd/system/{{ h_application_name}}-beat.service"
     state: present
-    params: 
-      PIDFile: "{{ application.directory }}/celeryscheduler.pid"
-      User: "{{ user.name }}"
-      Group: "{{ user.group }}"
-      RuntimeDirectory: celery 
-      WorkingDirectory: "{{ application.directory }}"
-      ExecStart: "{{ application.bin_directory }}/start-celery-beat"
+    params:
+      EnvironmentFile: "-/etc/default/{{ h_application_name }}"
+      PIDFile: "{{ h_directory }}/celeryscheduler.pid"
+      User: "{{ h_user }}"
+      Group: "{{ h_user_group }}"
+      RuntimeDirectory: celery
+      WorkingDirectory: "{{ h_directory }}"
+      ExecStart: "{{ h_bin_directory }}/hypothesis celery beat"
       ExecReload: "/bin/kill -s HUP $MAINPID"
       ExecStop: "/bin/kill -s TERM $MAINPID"
+      PrivateTmp: true
 
-# These are the environment files created for the services which need the env vars
-env_files:
-  hypothesis:
-    template: etc/default/env
-    dest: /etc/default/h
-    env_vars:
-      <<: *default_env
+# pip role vars
+pip_package: python3-pip
 
-# These are the tmpfiles.d used for the services which set permissions on the tmp files
-tmpfiles:
- h_socket:
-   template: etc/tmpfiles.d/tmpfile
-   dest: "/etc/tmpfiles.d/{{ application.name }}.conf"
-   tmpfile: "d /tmp/{{ application.name }}.sock 0755 {{ user.name }} {{ user.group }} -"
+# nginx
+nginx_remove_default_vhost: true
+nginx_vhosts:
+  - listen: "443 ssl"
+    server_name: "local.openstax.org"
+    server_name_redirect: "local.openstax.org"
+    root: "{{ h_directory }}"
+    state: "present"
+    filename: "{{ h_application_name }}.conf"
+    upstreams: |
+      upstream web { server unix:/tmp/h.sock fail_timeout=0; }
+      upstream websocket { server unix:/tmp/h-websocket.sock fail_timeout=0; }
+    extra_parameters: |
+      ssl_certificate /etc/ssl/certs/{{ ssl_cert_file_name }}.crt;
+      ssl_certificate_key /etc/ssl/private/{{ ssl_s3_key_name }};
+      ssl_prefer_server_ciphers on;
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+      ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+      ssl_ciphers
+          'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:AES:CAMELLIA:DES-CBC3-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA';
+      client_max_body_size 4G;
+      large_client_header_buffers 4 32k;
+      keepalive_timeout 5;
+      location /ws {
+        proxy_pass http://websocket;
+        proxy_http_version 1.1;
+        proxy_redirect off;
+        proxy_buffering off;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Server $http_host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
 
-# The vars originally used in this playbook were based on using hashes
-# We are moving away from that so to using "flatter" 
-# namespaced variables that start with rolename_var_name.
+      location /api {
+        proxy_pass http://web;
+        proxy_http_version 1.1;
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 10s;
+        proxy_read_timeout 10s;
+        proxy_redirect off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Server $http_host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Request-Start "t=${msec}";
+        }
 
 # postgresql
 pg_version: 9.6
 pg_is_master_server: true
 pg_host: "{{ postgres.host }}"
+pg_extra_packages:
+  - python3-psycopg2
 
 pg_databases:
   - name: "{{ postgres.databases[0].name }}"
 
-pg_users: 
+pg_users:
   - name: "{{ postgres.users[0].name }}"
     password:  "{{ postgres.users[0].password }}"
     db: "{{ postgres.users[0].db }}"
-    roles: "{{ postgres.users[0].roles }}"
 
 # npm
 nodejs_npm_global_packages: ['gulp-cli']
-nodejs_install_npm_user: "{{ user.name }}"
-nodejs_package_json_path: "{{ application.directory }}"
+nodejs_install_npm_user: "{{ h_user }}"
+nodejs_package_json_path: "{{ h_directory }}"
 
 # ssl
 ssl_www_user: www-data
@@ -236,50 +234,16 @@ ssl_copy: ~
 # papertrail
 papertrail_url: "{{ papertrail.url }}"
 papertrail_ssl_dest_cert_dir: "{{ ssl_dest_cert_dir }}"
-papertrail_watch_files: 
-  - path: "{{ application.access_log }}"
-    unique_name: "{{ application.name }}_access"
-  - path: "{{ application.error_log }}"
-    unique_name: "{{ application.name }}_error"
-  - path: "{{ application.worker_log }}"
-    unique_name: "{{ application.name }}_celery_worker"
-  - path: "{{ application.celery_beat_log }}"
-    unique_name: "{{ application.name }}_celery_beat"
-  - path: "{{ nginx.error_log }}"
-    unique_name: "{{ application.name }}_nginx_error"
-  - path: "{{ nginx.access_log }}"
-    unique_name: "{{ application.name }}_nginx_access"
-
-# We define the main settings for the application role. This should happen last so that
-# we can assume all the other values exist if needed and can be passed into our config
-hypothesis:
-  application_name: "{{ application.name }}"
-  user: "{{ user.name }}"
-  group: "{{ user.group }}"
-  server_name: "{{ application.server_name }}"
-  application_dir: "{{ application.directory }}"
-  ssl_on: yes
-  ssl_cert_file_name: "{{ ssl_cert_file_name }}"
-  s3_key_name: "{{ ssl_s3_key_name }}" 
-  <<: *virtualenv
-  virtualenv_bin_dir: "{{ virtualenv.bin_dir }}"
-  virtualenv_python: "{{ virtualenv.python }}"
-  client_id: "{{ wsgi.hypothesis_client_id }}" 
-  client_secret: "{{ wsgi.hypothesis_client_secret }}"
-  secret_key: "{{ wsgi.hypothesis_secret_key }}"  
-  box_rsa_private_key_content: "{{ box.rsa_private_key_content }}"
-  box_rsa_private_key_path: "{{ box.rsa_private_key_path }}"
-  database:
-    user: "{{ postgres.users[0].name }}"
-    password: "{{ postgres.users[0].password }}"
-    host: "{{ postgres.host }}"
-    database_name: "{{ postgres.users[0].db }}"
-  init_scripts: "{{ init_scripts }}"
-  services: "{{ services }}"
-  env_files: "{{ env_files }}"
-  tmpfiles: "{{ tmpfiles }}"
-
-# Override the vars specific to the role
-openstax_wsgi_role: "{{ wsgi }}"
-openstax_hypothesis_role: "{{ hypothesis }}"
-
+papertrail_watch_files:
+  - path: "{{ h_access_log }}"
+    unique_name: "{{ h_application_name }}_access"
+  - path: "{{ h_error_log }}"
+    unique_name: "{{ h_application_name }}_error"
+  - path: "{{ h_worker_log }}"
+    unique_name: "{{ h_application_name }}_celery_worker"
+  - path: "{{ h_celery_beat_log }}"
+    unique_name: "{{ h_application_name }}_celery_beat"
+  - path: "/var/log/nginx/error.log"
+    unique_name: "{{ h_application_name }}_nginx_error"
+  - path: "/var/log/nginx/access.log"
+    unique_name: "{{ h_application_name }}_nginx_access"

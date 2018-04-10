@@ -154,8 +154,8 @@ pip_package: python3-pip
 nginx_remove_default_vhost: true
 nginx_vhosts:
   - listen: "443 ssl"
-    server_name: "local.openstax.org"
-    server_name_redirect: "local.openstax.org"
+    server_name: "{{ h_app_url }}"
+    server_name_redirect: "{{ h_app_url }}"
     root: "{{ h_directory }}"
     state: "present"
     filename: "{{ h_application_name }}.conf"

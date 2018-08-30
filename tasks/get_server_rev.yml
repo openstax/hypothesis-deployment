@@ -32,6 +32,6 @@
 
 - name: set hypothesis-server revision
   set_fact:
-    gh_repo_revision: "{{ server_rev.stdout }}"
+    gh_repo_version: "{{ server_rev.stdout }}"
   tags:
     - pre-flight

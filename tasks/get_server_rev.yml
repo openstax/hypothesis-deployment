@@ -1,0 +1,37 @@
+# vim: ft=yaml syntax=yaml sts=2 ts=2 sw=2 nosr et nu ru
+%YAML 1.1
+---
+- name: set hypothesis-server directory
+  set_fact:
+    server_dir: "{{ playbook_dir | dirname }}/hypothesis-server"
+  tags:
+    - pre-flight
+
+- name: check for hypothesis-server directory
+  become: no
+  stat:
+    path: "{{ server_dir }}"
+    get_checksum: no
+    get_attributes: no
+  register: server_dir_stat
+  delegate_to: 127.0.0.1
+  tags:
+    - pre-flight
+
+- name: get hypothesis-server revision
+  become: no
+  command: git rev-parse HEAD@{0}
+  args:
+    chdir: "{{ server_dir }}"
+    warn: no
+  changed_when: False
+  register: server_rev
+  delegate_to: 127.0.0.1
+  tags:
+    - pre-flight
+
+- name: set hypothesis-server revision
+  set_fact:
+    gh_repo_version: "{{ server_rev.stdout }}"
+  tags:
+    - pre-flight

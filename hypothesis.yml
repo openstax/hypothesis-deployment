@@ -2,6 +2,11 @@
 - name: OpenStax Hypothesis Deployment
   hosts: hypothesis
   pre_tasks:
+    # This will automatically update the galaxy roles
+    # If the galaxy_roles directory doesn't already exist, it will complain.
+    - import_tasks: tasks/galaxy_update.yml
+      run_once: true
+      tags: galaxy-update
     - import_tasks: tasks/get_server_rev.yml
       run_once: true
       tags: pre-flight
@@ -28,3 +33,17 @@
     - role: openstax.papertrail
       tags:
         - papertrail
+  tasks:
+    - name: restart hypothesis services
+      become: yes 
+      service:
+        name: "{{ service_name }}"
+        enabled: yes 
+        state: restarted
+      tags: service-restart
+      loop:
+        - h
+        - h-beat
+        - h-worker
+      loop_control:
+        loop_var: service_name

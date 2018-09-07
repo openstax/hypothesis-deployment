@@ -27,11 +27,18 @@
   changed_when: False
   register: server_rev
   delegate_to: 127.0.0.1
+  when:
+    - server_dir_stat['stat']['exists'] | default(False)
   tags:
     - pre-flight
 
-- name: set hypothesis-server revision
+- name: set hypothesis-server revision from directory
   set_fact:
-    gh_repo_version: "{{ server_rev.stdout }}"
+    gh_repo_version: "{{ server_rev.stdout | default('master') }}"
   tags:
     - pre-flight
+
+- pause:
+    prompt: master is in use. Proceed?
+  when:
+    - gh_repo_version == 'master'

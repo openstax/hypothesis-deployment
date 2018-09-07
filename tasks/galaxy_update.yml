@@ -1,0 +1,12 @@
+# vim: ft=yaml syntax=yaml sts=2 ts=2 sw=2 nosr et nu ru
+%YAML 1.1
+---
+- name: update galaxy roles
+  become: no
+  command: ansible-galaxy install --force --role-file=requirements.yml
+  args:
+    chdir: "{{ playbook_dir }}"
+  delegate_to: 127.0.0.1
+  tags:
+    - pre-flight
+    - galaxy
